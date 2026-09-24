@@ -21,7 +21,12 @@ wss.on("connection", ws => {
       if (!r) return send(ws, { t: "err", msg: "Room not found" });
       r.members.set(ws.id, ws); ws.code = code;
       send(ws, { t: "joined", code, id: ws.id });
-      return send(r.host, { t: "peer-join", id: ws.id, name: String(m.name || "Player").slice(0, 16) });
+      return send(r.host, {
+        t: "peer-join", id: ws.id,
+        name: String(m.name || "Player").slice(0, 16),
+        teamName: String(m.teamName || "").slice(0, 20),
+        color: /^#[0-9a-f]{6}$/i.test(m.color) ? m.color : ""
+      });
     }
     const r = rooms[ws.code]; if (!r) return;
     if (ws === r.host) r.members.forEach((c, id) => { if (c !== ws && (m.to == null || m.to === id)) send(c, m); });
