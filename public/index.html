@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cricket Auction</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0d1a14;--panel:#14261d;--card:#172b21;--line:#264434;--text:#eef3ee;--mute:#8fa89a;--ball:#d8402f;
+        --diamond:#7fdcff;--gold:#e6b447;--silver:#bcc6d0;--bronze:#c9803f;
+        --bat:#f2b134;--bowl:#e4574a;--all:#3cc4b0;--head:'Oswald','Arial Narrow',Impact,sans-serif}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;color:var(--text);font-family:system-ui,Segoe UI,Roboto,sans-serif;
+    background:radial-gradient(ellipse at 50% 120%,#1d4a34 0,transparent 60%),var(--bg)}
+  #app{max-width:1000px;margin:0 auto;padding:24px 18px}
+  button{font:inherit;cursor:pointer}
+  button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+  /* menu */
+  .center{min-height:85vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}
+  .logo{width:74px;height:74px;border-radius:50%;background:var(--ball);position:relative;margin-bottom:18px;
+    box-shadow:inset -8px -8px 14px #0004}
+  .logo::before,.logo::after{content:"";position:absolute;left:8px;right:8px;height:2px;border-top:2px dashed #fff8;top:30px}
+  .logo::after{top:42px}
+  h1{font-family:var(--head);font-size:clamp(2.6rem,9vw,4.6rem);line-height:1;margin:0;letter-spacing:.02em}
+  .sub{color:var(--mute);margin:10px 0 34px}
+  .menu-btns{display:flex;flex-direction:column;gap:12px;width:min(320px,100%)}
+  .btn{padding:15px 20px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--text);
+    font-family:var(--head);font-size:1.2rem;letter-spacing:.05em}
+  .btn.primary{background:var(--ball);border-color:var(--ball)}
+  .btn:hover{filter:brightness(1.15)}
+  .link{background:none;border:0;color:var(--mute);margin-top:16px}
+
+  /* forms */
+  .form{width:min(460px,100%);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;text-align:left}
+  .form h2{font-family:var(--head);font-size:1.8rem;margin:0 0 18px}
+  label{display:flex;justify-content:space-between;align-items:baseline;margin:16px 0 6px;color:var(--mute);font-size:.9rem}
+  label b{color:var(--text);font-family:var(--head);font-size:1.4rem}
+  input[type=text],input[type=number]{width:100%;padding:12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:1rem}
+  input[type=range]{width:100%;accent-color:var(--ball)}
+  .hint{font-size:.8rem;color:var(--mute);margin-top:2px}
+  .code-in{text-align:center;font-family:var(--head);font-size:2rem!important;letter-spacing:.3em;text-transform:uppercase}
+  .form .btn{width:100%;margin-top:22px}
+
+  /* room header */
+  .room{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+  .room h2{font-family:var(--head);margin:0;font-size:1.8rem}
+  .room small{color:var(--mute)}
+  .room .code{font-family:var(--head);background:var(--panel);border:1px dashed var(--gold);color:var(--gold);padding:2px 10px;border-radius:6px;letter-spacing:.15em}
+  .room .btn{font-size:1rem;padding:8px 16px}
+
+  /* player cards */
+  #players{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:12px}
+  .card{display:flex;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .T-diamond{--t:var(--diamond)}.T-gold{--t:var(--gold)}.T-silver{--t:var(--silver)}.T-bronze{--t:var(--bronze)}
+  .card .left{width:84px;flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+    background:linear-gradient(160deg,color-mix(in srgb,var(--t) 35%,transparent),transparent);border-right:2px solid var(--t)}
+  .tier{font-family:var(--head);color:var(--t);font-size:1.05rem;letter-spacing:.06em}
+  .stars{font-size:.8rem;color:var(--t);letter-spacing:1px}
+  .stars i{font-style:normal;opacity:.25}
+  .card .body{padding:10px 12px;flex:1;min-width:0}
+  .name{font-weight:700;font-size:1.05rem}
+  .role{display:inline-block;margin-top:2px;font-size:.72rem;font-weight:600;padding:1px 8px;border-radius:99px;
+    color:var(--c);border:1px solid var(--c)}
+  .BAT{--c:var(--bat)}.BOWL{--c:var(--bowl)}.ALL{--c:var(--all)}
+  .stats{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px}
+  .stat b{display:block;font-size:.95rem}
+  .stat span{font-size:.68rem;color:var(--mute)}
+  .price{flex:none;padding:10px 14px;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;border-left:1px solid var(--line)}
+  .price b{font-family:var(--head);font-size:1.4rem;color:var(--t)}
+  .price span{font-size:.68rem;color:var(--mute)}
+
+  /* slider card (bottom of screen) */
+  .slider-host{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;padding:0 12px calc(12px + env(safe-area-inset-bottom,0px));pointer-events:none;z-index:50}
+  .slider-card{width:min(560px,100%);background:var(--panel);border:1px solid var(--gold);border-radius:12px;padding:10px 10px 0;
+    box-shadow:0 -8px 30px #000a;transform:translateY(130%);transition:transform .3s ease-out;overflow:hidden}
+  .slider-card.in{transform:none}
+  .sc-head{display:flex;justify-content:space-between;align-items:baseline;padding:0 4px 8px;font-family:var(--head);letter-spacing:.06em}
+  .sc-head span{color:var(--gold);font-size:1.05rem}.sc-head b{font-size:1.2rem}
+  .slider-card .card{margin:0}
+  .sc-bar{height:4px;margin:10px -10px 0;background:var(--line)}
+  .sc-bar i{display:block;height:100%;background:var(--ball);animation:sc-shrink linear forwards}
+  @keyframes sc-shrink{from{width:100%}to{width:0}}
+  @media(prefers-reduced-motion:reduce){.slider-card{transition:none}}
+  #players{padding-bottom:230px}
+
+  /* team setup, auction stage, transition */
+  .wide{width:min(640px,100%)!important}
+  .trow{margin:12px 0;padding:10px;border:1px solid var(--line);border-radius:8px}
+  .sw{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .swatch{width:28px;height:28px;border-radius:50%;border:2px solid transparent;padding:0}
+  .swatch.on{border-color:#fff}
+  .bidbox{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:14px;font-family:var(--head);font-size:1.5rem}
+  .bidbox small{color:var(--mute);font-family:system-ui,sans-serif;font-size:.8rem;margin-left:8px}
+  .stage{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;padding-bottom:270px}
+  .tp{background:var(--card);border:1px solid var(--line);border-top:4px solid var(--tc);border-radius:10px;padding:10px 12px}
+  .tp.lead{box-shadow:0 0 0 2px var(--gold)}
+  .tn{display:flex;justify-content:space-between;gap:8px;font-weight:700}
+  .tn span{font-size:.75rem;color:var(--mute);font-weight:600}
+  .pu{margin:6px 0;font-family:var(--head);font-size:1.25rem}
+  .pu small{font-family:system-ui,sans-serif;color:var(--mute);font-size:.72rem;display:block}
+  .p-low .pu{color:var(--gold)}
+  .p-empty{background:#2b2118;border-top-color:#6b4a2f;color:#a98a6a}
+  .tb{display:flex;gap:6px}
+  .tb button{flex:1;padding:8px 4px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:.8rem}
+  .tb button[data-a=bid]{background:var(--ball);border-color:var(--ball);flex:1.7}
+  .tb button:disabled{opacity:.35;cursor:not-allowed}
+  .tview{margin-bottom:14px}.tview[hidden]{display:none}
+  .tvt{border-left:4px solid var(--tc);background:var(--card);padding:8px 12px;margin-bottom:10px;border-radius:6px}
+  .tvh{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:4px}
+  .tvh span{color:var(--mute);font-size:.85rem}
+  .tvs{font-size:.85rem;padding:2px 0;display:flex;gap:8px;align-items:center}
+  .tvs em{color:var(--mute);font-style:normal}.tvs i{color:var(--mute)}
+  .toasts{position:fixed;top:12px;left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:8px;z-index:120;pointer-events:none}
+  .toast{background:var(--panel);border:1px solid var(--ball);padding:8px 14px;border-radius:8px;font-size:.9rem;max-width:90%}
+  .tr{position:fixed;inset:0;z-index:100;background:var(--bg);border-left:10px solid var(--tc);display:flex;align-items:center;justify-content:center;
+    transform:translateX(-100%);transition:transform .4s ease}
+  .tr.in{transform:none}.tr.out{transform:translateX(100%)}
+  .tr-in{text-align:center;padding:20px}.tr-in small{display:block;color:var(--mute);min-height:1.2em}
+  .tr-in h2{font-family:var(--head);font-size:clamp(2rem,8vw,3.6rem);margin:8px 0;color:var(--tc)}
+  .tr-in p{margin:0;color:var(--mute)}
+  @media(prefers-reduced-motion:reduce){.tr{transition:none}}
+  @media(max-width:420px){#players{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* ================= Helpers ================= */
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+function toast(msg) {
+  let h = document.querySelector(".toasts");
+  if (!h) { h = document.createElement("div"); h.className = "toasts"; document.body.appendChild(h); }
+  const d = document.createElement("div"); d.className = "toast"; d.textContent = msg; h.appendChild(d);
+  setTimeout(() => d.remove(), 3500);
+}
+
+/* ================= PlayerFactory =================
+   Add a player: one create(...) line. Add a tier: one line in TIERS.
+   Base price comes from the star rating (RATING_PRICE), not random. */
+const PlayerFactory = (() => {
+  const ROLES = { ALL: "All-rounder", BAT: "Batsman", BOWL: "Bowler" };   // order = who gets extra team slots first
+  const TIERS = { diamond: "Diamond", gold: "Gold", silver: "Silver", bronze: "Bronze" };
+  const RATING_PRICE = { 5: 2.0, 4: 1.5, 3: 1.0, 2: 0.5, 1: 0.2 };   // crore
+
+  const STAT_SCHEMA = {
+    BAT:  { matches: "Matches", runs: "Runs", average: "Bat avg", strikeRate: "Strike rate", hundreds: "100s" },
+    BOWL: { matches: "Matches", wickets: "Wickets", average: "Bowl avg", economy: "Economy", best: "Best" },
+    ALL:  { runs: "Runs", batAvg: "Bat avg", wickets: "Wickets", economy: "Economy", matches: "Matches" }
+  };
+
+  let nextId = 1;
+  const list = [];
+
+  function create(name, role, tier, rating, stats) {
+    if (!ROLES[role]) throw new Error("Unknown role: " + role);
+    if (!TIERS[tier]) throw new Error("Unknown tier: " + tier);
+    if (!RATING_PRICE[rating]) throw new Error("Rating must be 1-5");
+    const clean = {};
+    for (const k in STAT_SCHEMA[role]) clean[k] = stats[k] ?? "-";
+    const p = { id: nextId++, name, role, roleLabel: ROLES[role], tier, tierLabel: TIERS[tier],
+                rating, basePrice: RATING_PRICE[rating], stats: clean };
+    list.push(p);
+    return p;
+  }
+
+  //            name                 role    tier       ★  stats
+  create("Virat Kohli",       "BAT",  "diamond", 5, { matches: 252, runs: 8004, average: 38.7, strikeRate: 131.9, hundreds: 8 });
+  create("Rohit Sharma",      "BAT",  "diamond", 5, { matches: 257, runs: 6628, average: 29.7, strikeRate: 130.4, hundreds: 2 });
+  create("Jasprit Bumrah",    "BOWL", "diamond", 5, { matches: 133, wickets: 165, average: 22.5, economy: 7.4, best: "5/10" });
+  create("Suryakumar Yadav",  "BAT",  "gold",    4, { matches: 150, runs: 3594, average: 32.0, strikeRate: 145.5, hundreds: 2 });
+  create("Hardik Pandya",     "ALL",  "gold",    4, { runs: 2525, batAvg: 27.5, wickets: 64,  economy: 9.1, matches: 137 });
+  create("Ravindra Jadeja",   "ALL",  "gold",    4, { runs: 2959, batAvg: 27.4, wickets: 160, economy: 7.6, matches: 240 });
+  create("Rashid Khan",       "BOWL", "gold",    4, { matches: 121, wickets: 149, average: 22.0, economy: 6.8, best: "3/19" });
+  create("Andre Russell",     "ALL",  "silver",  3, { runs: 2484, batAvg: 28.5, wickets: 115, economy: 9.2, matches: 140 });
+  create("Trent Boult",       "BOWL", "silver",  3, { matches: 100, wickets: 120, average: 26.0, economy: 8.3, best: "4/18" });
+  create("Yuzvendra Chahal",  "BOWL", "silver",  3, { matches: 160, wickets: 205, average: 22.0, economy: 7.9, best: "5/40" });
+  create("Tilak Varma",       "BAT",  "bronze",  2, { matches: 50, runs: 1400, average: 36.0, strikeRate: 143.0, hundreds: 0 });
+  create("Harshit Rana",      "BOWL", "bronze",  1, { matches: 25, wickets: 30, average: 26.0, economy: 9.3, best: "3/33" });
+
+  return { create, roles: () => Object.keys(ROLES), roleLabel: r => ROLES[r], getAll: () => list.slice(), getById: id => list.find(p => p.id === id),
+           getByTier: t => list.filter(p => p.tier === t), labelsFor: r => STAT_SCHEMA[r] };
+})();
+
+/* ================= TeamFactory =================
+   Not used by the UI yet. Teams are plain data (safe to send over sockets);
+   all actions are functions that take the team. Works with any roles/players:
+   pass different roles in options, or change PlayerFactory's roles.
+   Try in the console:  const t = TeamFactory.create({slotCount: 6});
+                        TeamFactory.addPlayer(t, PlayerFactory.getById(1)); TeamFactory.overall(t) */
+const TeamFactory = (() => {
+  const config = {
+    mismatchPenalty: 0.6,   // a player in a slot of another role scores 60% of their value
+    palette: ["#e4574a", "#3cc4b0", "#f2b134", "#7fdcff", "#b48cf2", "#8ad06a", "#f28cb8", "#f0803c", "#5f8cf2", "#c9c9c9"]
+  };
+  let nextId = 1;
+
+  // Splits slots evenly across roles: 3 -> 1/1/1, 6 -> 2/2/2, 12 -> 4/4/4. Extras go to earlier roles.
+  function roleQuota(slotCount, roles = PlayerFactory.roles()) {
+    const q = {}, base = Math.floor(slotCount / roles.length);
+    let extra = slotCount % roles.length;
+    roles.forEach(r => { q[r] = base + (extra-- > 0 ? 1 : 0); });
+    return q;
+  }
+
+  function create({ name, color, owner = null, slotCount = 6, roles } = {}) {
+    const quota = roleQuota(slotCount, roles), slots = [];
+    for (const r in quota) for (let i = 0; i < quota[r]; i++) slots.push({ id: slots.length + 1, role: r, player: null });
+    const id = nextId++;
+    return { id, name: name || "Team " + id, color: color || config.palette[(id - 1) % config.palette.length], owner, quota, slots };
+  }
+
+  const createMany = (count, slotCount, opts = {}) => Array.from({ length: count }, () => create({ ...opts, slotCount }));
+
+  // slotId optional: without it, the player goes to an empty slot of their role, else any empty slot.
+  function addPlayer(team, player, slotId) {
+    if (team.slots.some(s => s.player && s.player.id === player.id)) return { ok: false, reason: "Already in this team" };
+    const empty = team.slots.filter(s => !s.player);
+    const slot = slotId ? empty.find(s => s.id === slotId) : (empty.find(s => s.role === player.role) || empty[0]);
+    if (!slot) return { ok: false, reason: slotId ? "Slot not available" : "Team is full" };
+    slot.player = player;
+    return { ok: true, slot };
+  }
+
+  function removePlayer(team, slotId) {
+    const slot = team.slots.find(s => s.id === slotId);
+    const removed = slot ? slot.player : null;
+    if (slot) slot.player = null;
+    return removed;
+  }
+
+  // 0..1: star value of the player, reduced if they sit in the wrong role's slot
+  const slotScore = slot => !slot.player ? 0 :
+    (slot.player.rating / 5) * (slot.player.role === slot.role ? 1 : config.mismatchPenalty);
+
+  // 0..100: all top-rated players in the right slots = 100. Wrong roles and empty slots pull it down.
+  const overall = team => Math.round(100 * team.slots.reduce((sum, s) => sum + slotScore(s), 0) / team.slots.length);
+
+  const roleCounts = team => {
+    const c = {}; Object.keys(team.quota).forEach(r => c[r] = 0);
+    team.slots.forEach(s => { if (s.player) c[s.player.role] = (c[s.player.role] || 0) + 1; });
+    return c;
+  };
+  const filledCount = team => team.slots.filter(s => s.player).length;
+  const isFull = team => filledCount(team) === team.slots.length;
+  const setName = (team, name) => { team.name = String(name).trim().slice(0, 20) || team.name; return team; };
+  const setColor = (team, color) => { if (/^#[0-9a-f]{6}$/i.test(color)) team.color = color; return team; };
+
+  return { config, roleQuota, create, createMany, addPlayer, removePlayer, slotScore, overall,
+           roleCounts, filledCount, isFull, setName, setColor };
+})();
+
+/* ================= PurseFactory =================
+   Not used by the UI yet. One purse per team, all independent. Pure calculation, plain data.
+   Amounts are in rupee crore by default (change config.unit for another scale).
+   Try in the console:  const t = TeamFactory.create(); const p = PurseFactory.create(t.id, 100);
+                        PurseFactory.spend(p, 30, PlayerFactory.getById(1)); p.remaining */
+const PurseFactory = (() => {
+  const config = { symbol: "₹", unit: "Cr", lowPercent: 0.10 };
+  const round = n => Math.round(n * 100) / 100;                 // avoids 0.1 + 0.2 style errors
+  const format = n => config.symbol + round(n) + " " + config.unit;
+
+  function create(teamId, total) {
+    total = round(+total);
+    if (!(total > 0)) throw new Error("Purse must be more than 0");
+    return { teamId, total, remaining: total, spent: 0, lowWarned: false, blockedIds: [], history: [] };
+  }
+  // one independent purse per team, keyed by team id
+  const createMany = (teams, total) => Object.fromEntries(teams.map(t => [t.id, create(t.id, total)]));
+
+  const lowThreshold = p => round(p.total * config.lowPercent);   // 10% of THIS purse (12 of 120, 5 of 50...)
+  const isLow = p => p.remaining <= lowThreshold(p);
+  const canAfford = (p, price) => price > 0 && price <= p.remaining;
+
+  // "ok" | "low" | "empty". "empty" = nothing left, or not enough even for the cheapest player (pass minPrice).
+  const status = (p, minPrice = 0) => (p.remaining <= 0 || (minPrice && p.remaining < minPrice)) ? "empty" : isLow(p) ? "low" : "ok";
+
+  // Splits a player pool into what this team can and cannot afford (flag for the UI later)
+  function affordability(p, players, priceOf = pl => pl.basePrice) {
+    const can = [], cant = [];
+    players.forEach(pl => (canAfford(p, priceOf(pl)) ? can : cant).push(pl));
+    return { can, cant };
+  }
+
+  // Deducts a purchase. Never goes below zero. Pass the remaining pool to also get the "can't afford" warning.
+  // Warnings fire once: "low" once per team, "blocked" once per player.
+  function spend(p, price, player = null, pool = null) {
+    price = round(+price);
+    if (!(price > 0)) return { ok: false, reason: "Invalid amount", warnings: [] };
+    if (price > p.remaining)
+      return { ok: false, reason: `Not enough purse: needs ${format(price)}, has ${format(p.remaining)}`, warnings: [] };
+    p.remaining = round(p.remaining - price);
+    p.spent = round(p.spent + price);
+    p.history.push({ playerId: player ? player.id : null, price });
+
+    const warnings = [];
+    if (!p.lowWarned && isLow(p)) {
+      p.lowWarned = true;
+      warnings.push({ type: "low", message: `Low purse: only ${format(p.remaining)} left` });
+    }
+    if (pool) {
+      const fresh = affordability(p, pool).cant.filter(pl => !p.blockedIds.includes(pl.id));
+      if (fresh.length) {
+        fresh.forEach(pl => p.blockedIds.push(pl.id));
+        warnings.push({ type: "blocked", players: fresh, message: `Not enough purse for: ${fresh.map(pl => pl.name).join(", ")}` });
+      }
+    }
+    return { ok: true, remaining: p.remaining, warnings };
+  }
+
+  // Gives the money back (for example if a purchase is undone)
+  function refund(p, playerId) {
+    const i = p.history.findIndex(h => h.playerId === playerId);
+    if (i < 0) return { ok: false, reason: "No purchase found" };
+    const [h] = p.history.splice(i, 1);
+    p.remaining = round(p.remaining + h.price);
+    p.spent = round(p.spent - h.price);
+    return { ok: true, remaining: p.remaining };
+  }
+
+  return { config, format, create, createMany, lowThreshold, isLow, canAfford, status, affordability, spend, refund };
+})();
+
+/* ================= Card rendering ================= */
+function renderPlayerCard(p) {
+  const labels = PlayerFactory.labelsFor(p.role);
+  const stats = Object.keys(labels).map(k => `<div class="stat"><b>${p.stats[k]}</b><span>${labels[k]}</span></div>`).join("");
+  const stars = "★".repeat(p.rating) + `<i>${"★".repeat(5 - p.rating)}</i>`;
+  return `<div class="card T-${p.tier}">
+    <div class="left"><div class="tier">${p.tierLabel}</div><div class="stars">${stars}</div></div>
+    <div class="body"><div class="name">${p.name}</div><span class="role ${p.role}">${p.roleLabel}</span>
+      <div class="stats">${stats}</div></div>
+    <div class="price"><b>${p.basePrice.toFixed(1)} Cr</b><span>Base price</span></div>
+  </div>`;
+}
+
+/* ================= SliderCardFactory =================
+   Shows any card at the bottom of the screen for N seconds, then slides it away.
+   Reusable: pass any html, label and seconds. Only one card is on screen at a time.
+   Try in the console:  SliderCardFactory.showPlayer(PlayerFactory.getById(1), 5) */
+const SliderCardFactory = (() => {
+  let host = null, current = null;
+
+  function show({ html, label = "Up next", seconds = 15, onDone } = {}) {
+    if (!host) { host = document.createElement("div"); host.className = "slider-host"; document.body.appendChild(host); }
+    if (current) current.close(false);                       // a new card replaces the old one
+    const el = document.createElement("div");
+    el.className = "slider-card";
+    el.innerHTML = `<div class="sc-head"><span>${label}</span><b>${seconds}s</b></div>${html}
+      <div class="sc-bar"><i style="animation-duration:${seconds}s"></i></div>`;
+    host.appendChild(el);
+    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add("in")));
+
+    let left = seconds;
+    const label$ = el.querySelector(".sc-head b");
+    const tick = setInterval(() => { left--; label$.textContent = Math.max(left, 0) + "s"; if (left <= 0) handle.close(true); }, 1000);
+    const handle = {
+      reset(sec, lab) {                                      // restarts the countdown without sliding again
+        left = sec; label$.textContent = sec + "s";
+        if (lab) el.querySelector(".sc-head span").textContent = lab;
+        const i = el.querySelector(".sc-bar i"); i.style.animation = "none"; void i.offsetWidth;
+        i.style.animation = ""; i.style.animationDuration = sec + "s";
+      },
+      close(finished) {
+        if (current !== handle) return;
+        clearInterval(tick); current = null;
+        el.classList.remove("in"); setTimeout(() => el.remove(), 350);
+        if (onDone) onDone(finished);                        // finished = true when the time ran out
+      }
+    };
+    current = handle;
+    return handle;
+  }
+
+  const showPlayer = (player, seconds, opts = {}) => show({ html: renderPlayerCard(player), seconds, ...opts });
+  const hide = () => { if (current) current.close(false); };
+
+  return { show, showPlayer, hide };
+})();
+
+/* ================= BidFactory / SkipFactory / WithdrawFactory =================
+   Pure lot logic (no screen). A "lot" is one player on the block. */
+const BidFactory = (() => {
+  const config = { bidSeconds: 50, increment: 0.25 };        // increment in crore
+  const r2 = n => Math.round(n * 100) / 100;
+  const leader = lot => lot.bids.length ? lot.bids[lot.bids.length - 1] : null;
+  const nextAmount = lot => leader(lot) ? r2(leader(lot).amount + config.increment) : lot.player.basePrice;
+
+  // ineligible: { teamId: "reason" } for teams that start out of this lot (squad full, can't afford)
+  const createLot = (player, teamIds, ineligible = {}) => ({ player, teamIds, bids: [], out: { ...ineligible }, status: "open" });
+
+  function bid(lot, teamId, purse) {
+    if (lot.status !== "open") return { ok: false, reason: "Bidding is closed" };
+    if (lot.out[teamId]) return { ok: false, reason: "You are out of this player" };
+    if (leader(lot) && leader(lot).teamId === teamId) return { ok: false, reason: "You already lead" };
+    const amount = nextAmount(lot);
+    if (!PurseFactory.canAfford(purse, amount)) return { ok: false, reason: "Not enough purse" };
+    lot.bids.push({ teamId, amount });
+    return { ok: true, amount };
+  }
+
+  // Returns "sold" / "unsold" when the lot can end right now, else null
+  function resolve(lot) {
+    const active = lot.teamIds.filter(id => !lot.out[id]), lead = leader(lot);
+    if (!lead) return active.length ? null : "unsold";               // everyone skipped: force skip
+    return active.every(id => id === lead.teamId) ? "sold" : null;   // everyone else out: no need to wait
+  }
+  const close = lot => leader(lot) ? "sold" : "unsold";              // timer ran out
+
+  return { config, leader, nextAmount, createLot, bid, resolve, close };
+})();
+
+const SkipFactory = {
+  skip(lot, teamId) {
+    if (lot.status !== "open" || lot.out[teamId]) return { ok: false, reason: "Can't skip now" };
+    if (lot.bids.some(b => b.teamId === teamId)) return { ok: false, reason: "You bid already. Use withdraw" };
+    lot.out[teamId] = "Skipped";
+    return { ok: true };
+  }
+};
+
+const WithdrawFactory = {
+  withdraw(lot, teamId) {                                             // cancels your bids, counts as a skip
+    if (lot.status !== "open" || lot.out[teamId] || !lot.bids.some(b => b.teamId === teamId)) return { ok: false, reason: "Nothing to withdraw" };
+    lot.bids = lot.bids.filter(b => b.teamId !== teamId);
+    lot.out[teamId] = "Withdrew";
+    return { ok: true };
+  }
+};
+
+/* ================= TransitionFactory: full-screen wipe between players ================= */
+const TransitionFactory = {
+  play({ top = "", title = "", sub = "", color = "var(--gold)" } = {}) {
+    return new Promise(done => {
+      const el = document.createElement("div");
+      el.className = "tr"; el.style.setProperty("--tc", color);
+      el.innerHTML = `<div class="tr-in"><small>${esc(top)}</small><h2>${esc(title)}</h2><p>${esc(sub)}</p></div>`;
+      document.body.appendChild(el);
+      requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add("in")));
+      setTimeout(() => el.classList.add("out"), 1300);
+      setTimeout(() => { el.remove(); done(); }, 1700);
+    });
+  }
+};
+
+/* ================= AuctionFactory: runs the lots using everything above ================= */
+const AuctionFactory = (() => {
+  function create({ teams, purses, pool, cardSeconds = 15, hooks = {} }) {
+    const A = { teams, purses, queue: shuffle(pool.slice()), total: pool.length, done: 0, lot: null,
+                handle: null, results: [], finished: false, stopped: false };
+    const emit = () => hooks.onUpdate && hooks.onUpdate(A);
+    const teamOf = id => teams.find(t => t.id === id);
+    const reason = (t, p) => TeamFactory.isFull(t) ? "Squad full" : !PurseFactory.canAfford(purses[t.id], p.basePrice) ? "Can't afford" : null;
+
+    async function nextLot(msg) {
+      A.lot = null;
+      while (A.queue.length && !teams.every(t => TeamFactory.isFull(t))) {
+        const p = A.queue.shift(), out = {};
+        teams.forEach(t => { const r = reason(t, p); if (r) out[t.id] = r; });
+        const lot = BidFactory.createLot(p, teams.map(t => t.id), out);
+        if (BidFactory.resolve(lot)) { A.done++; A.results.push({ player: p, status: "unsold" }); msg = "Unsold: " + p.name; continue; }
+        emit();
+        const tro = { top: msg, title: p.name, sub: p.tierLabel + " · base " + PurseFactory.format(p.basePrice), color: `var(--${p.tier})` };
+        hooks.onTransition && hooks.onTransition(tro);
+        await TransitionFactory.play(tro);
+        if (A.stopped) return;
+        A.lot = lot; A.deadline = Date.now() + cardSeconds * 1000;
+        A.handle = SliderCardFactory.showPlayer(p, cardSeconds, { label: "On the block", onDone: ran => { if (ran) endLot(BidFactory.close(lot)); } });
+        emit(); return;
+      }
+      A.finished = true; emit(); hooks.onFinish && hooks.onFinish(A);
+    }
+
+    function endLot(result) {
+      const lot = A.lot; if (!lot || lot.status !== "open") return;
+      lot.status = result; A.lot = null;
+      const h = A.handle; A.handle = null; if (h) h.close(false);
+      let msg;
+      if (result === "sold") {
+        const w = BidFactory.leader(lot), t = teamOf(w.teamId);
+        TeamFactory.addPlayer(t, lot.player);
+        PurseFactory.spend(purses[t.id], w.amount, lot.player, A.queue)
+          .warnings.forEach(x => hooks.onWarn && hooks.onWarn(t, x));   // low purse (once) / can't afford (once per player)
+        A.results.push({ player: lot.player, status: "sold", teamId: t.id, price: w.amount });
+        msg = `Sold: ${lot.player.name} to ${t.name} for ${PurseFactory.format(w.amount)}`;
+      } else { A.results.push({ player: lot.player, status: "unsold" }); msg = "Unsold: " + lot.player.name; }
+      A.done++;
+      nextLot(msg);
+    }
+
+    // action(fn, restartTimer): runs a bid/skip/withdraw, then checks if the lot can end
+    const action = (fn, retimer) => id => {
+      const lot = A.lot; if (!lot || lot.status !== "open") return { ok: false };
+      const r = fn(lot, id);
+      if (!r.ok) return r;
+      if (retimer) { const sec = lot.bids.length ? BidFactory.config.bidSeconds : cardSeconds; A.deadline = Date.now() + sec * 1000; A.handle.reset(sec, lot.bids.length ? "Bidding" : "On the block"); }
+      const res = BidFactory.resolve(lot);
+      if (res) endLot(res); else emit();
+      return r;
+    };
+    A.bid = action((lot, id) => BidFactory.bid(lot, id, purses[id]), true);
+    A.skip = action(SkipFactory.skip, false);
+    A.withdraw = action(WithdrawFactory.withdraw, true);
+    A.stop = () => { A.stopped = true; };
+    A.start = () => nextLot("Auction begins");
+
+    // what a screen needs to draw each team's buttons
+    A.view = () => teams.map(t => {
+      const lot = A.lot, open = !!lot && lot.status === "open", purse = purses[t.id];
+      const mine = open ? lot.bids.filter(b => b.teamId === t.id).length : 0, out = open ? lot.out[t.id] : null;
+      const lead = open && BidFactory.leader(lot) && BidFactory.leader(lot).teamId === t.id;
+      return { team: t, purse, lead, status: !open ? "" : out || (lead ? "Leading" : mine ? "Outbid" : "Deciding"),
+        canBid: open && !out && !lead && PurseFactory.canAfford(purse, BidFactory.nextAmount(lot)),
+        canSkip: open && !out && !mine, canWithdraw: open && !out && mine > 0 };
+    });
+    return A;
+  }
+  return { create };
+})();
+
+/* ================= Screens (navigation) ================= */
+const Screens = (() => {
+  const builders = {};
+  const root = document.getElementById("app");
+  return {
+    register(id, fn) { builders[id] = fn; },
+    show(id, data) { SliderCardFactory.hide(); root.innerHTML = ""; root.appendChild(builders[id](data)); window.scrollTo(0, 0); }
+  };
+})();
+
+/* ================= RoomSettings (options only, not wired yet) ================= */
+const RoomSettings = {
+  newCode: () => Array.from({ length: 4 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 32)]).join(""),
+  current: null
+};
+
+/* ================= MenuFactory: builds each menu screen ================= */
+const MenuFactory = (() => {
+  const el = html => { const d = document.createElement("div"); d.innerHTML = html.trim(); return d.firstChild; };
+  const $ = (root, s) => root.querySelector(s);
+
+  function main() {
+    const e = el(`<div class="center"><div class="logo"></div><h1>Cricket Auction</h1>
+      <p class="sub">Build your squad. Outbid your friends.</p>
+      <div class="menu-btns"><button class="btn primary" id="c">Create room</button>
+      <button class="btn" id="j">Join room</button></div></div>`);
+    $(e, "#c").onclick = () => Screens.show("create");
+    $(e, "#j").onclick = () => Screens.show("join");
+    return e;
+  }
+
+  function create() {
+    const e = el(`<div class="center"><div class="form"><h2>Create room</h2>
+      <label>Room name</label><input type="text" id="name" maxlength="24" placeholder="Friday night auction">
+      <label>Your name</label><input type="text" id="me" maxlength="16" placeholder="Your name">
+      <label>Players <b id="pv">4</b></label><input type="range" id="p" min="1" max="10" value="4">
+      <label>Teams <b id="tv">2</b></label><input type="range" id="t" min="1" max="10" value="2">
+      <label>Slots per team <b id="kv">6</b></label><input type="range" id="k" min="3" max="12" value="6">
+      <div class="hint" id="split"></div>
+      <label>Purse per team <b id="uv"></b></label><input type="range" id="u" min="10" max="500" step="5" value="100">
+      <input type="number" id="un" min="1" step="any" value="100" aria-label="Purse amount in crore rupees">
+      <div class="hint">Slide, or type any amount in ₹ crore.</div>
+      <label>Time per player <b id="sv">15s</b></label><input type="range" id="s" min="5" max="60" step="5" value="15">
+      <div class="hint">How long each card stays before it skips.</div>
+      <button class="btn primary" id="go">Create</button>
+      <button class="link" id="back">Back</button></div></div>`);
+    const p = $(e, "#p"), t = $(e, "#t"), k = $(e, "#k"), s = $(e, "#s"), u = $(e, "#u"), un = $(e, "#un");
+    const purse = () => Math.max(1, +un.value || 0);
+    const sync = () => {
+      $(e, "#pv").textContent = p.value; $(e, "#tv").textContent = t.value;
+      $(e, "#kv").textContent = k.value; $(e, "#sv").textContent = s.value + "s";
+      $(e, "#uv").textContent = PurseFactory.format(purse());
+      const q = TeamFactory.roleQuota(+k.value);
+      $(e, "#split").textContent = "Each team: " + Object.keys(q).map(r => q[r] + " " + r.toLowerCase()).join(", ");
+    };
+    p.oninput = t.oninput = k.oninput = s.oninput = un.oninput = sync;
+    u.oninput = () => { un.value = u.value; sync(); };
+    un.addEventListener("input", () => { u.value = un.value; });
+    sync();
+    $(e, "#back").onclick = () => Screens.show("main");
+    $(e, "#go").onclick = () => {
+      RoomSettings.current = { code: RoomSettings.newCode(), name: $(e, "#name").value.trim() || "Untitled room",
+        players: +p.value, teams: +t.value, slots: +k.value, purse: purse(), timer: +s.value };
+      if (LocalTestMode.on) Screens.show("setup"); else Online.open("create", { name: $(e, "#me").value.trim() || "Host" });
+    };
+    return e;
+  }
+
+  function join() {
+    const e = el(`<div class="center"><div class="form"><h2>Join room</h2>
+      <label>Room code</label><input type="text" id="code" class="code-in" maxlength="4" placeholder="K7P2" autocomplete="off" value="${esc(new URLSearchParams(location.search).get("join") || "")}">
+      <label>Your name</label><input type="text" id="me" maxlength="16" placeholder="Your name">
+      <button class="btn primary" id="go">Join</button><button class="link" id="back">Back</button></div></div>`);
+    $(e, "#back").onclick = () => Screens.show("main");
+    $(e, "#go").onclick = () => {
+      const code = $(e, "#code").value.trim().toUpperCase();
+      if (code.length < 4) { $(e, "#code").focus(); return; }
+      Online.open("join", { code, name: $(e, "#me").value.trim() || "Player" });
+    };
+    return e;
+  }
+
+  function room() {
+    const r = RoomSettings.current;
+    const e = el(`<div class="center"><div class="form"><h2>${esc(r.name)}</h2>
+      <p class="hint">Room ${r.code}. Online rooms are not built yet. Set LocalTestMode.on = true to test the auction on one screen.</p>
+      <button class="btn" id="leave">Back to menu</button></div></div>`);
+    $(e, "#leave").onclick = () => Screens.show("main");
+    return e;
+  }
+
+  return { main, create, join, room };
+})();
+
+/* ================= Online play: Net + GameView + Online =================
+   The host's browser runs the auction engine. The server only relays messages.
+   Each player controls only the team they own. */
+const mk = html => { const d = document.createElement("div"); d.innerHTML = html.trim(); return d.firstChild; };
+
+const Net = { ws: null, id: null, code: null, host: false, h: {},
+  connect() { return new Promise((ok, no) => {
+    const ws = Net.ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host);
+    ws.onopen = () => ok(); ws.onerror = () => no();
+    ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch { return; } if (Net.h[m.t]) Net.h[m.t](m); };
+    ws.onclose = () => Net.h.closed && Net.h.closed();
+  }); },
+  send: m => { if (Net.ws && Net.ws.readyState === 1) Net.ws.send(JSON.stringify(m)); } };
+
+// everything a screen needs, as plain data (safe to send over the network)
+const modelOf = A => {
+  const lot = A.lot && A.lot.status === "open" ? A.lot : null, ld = lot && BidFactory.leader(lot);
+  return { teams: A.teams, purses: A.purses, done: A.done, total: A.total,
+    minP: A.queue.length ? Math.min(...A.queue.map(p => p.basePrice)) : 0,
+    left: A.deadline ? Math.max(0, Math.round((A.deadline - Date.now()) / 1000)) : 0,
+    lot: lot && { player: lot.player, next: BidFactory.nextAmount(lot), lead: ld ? ld.teamId : null, bidding: lot.bids.length > 0 },
+    view: A.view().map(v => ({ id: v.team.id, lead: v.lead, status: v.status, canBid: v.canBid, canSkip: v.canSkip, canWithdraw: v.canWithdraw })) };
+};
+
+const GameView = (() => {
+  let refresh = () => {};
+  const fmt = n => PurseFactory.format(n);
+  function build(M0, o) {                 // o: { act(kind, teamId), stop?, canControl(team) }
+    const e = mk(`<div><div class="room"><h2>Auction</h2><span><button class="btn" id="tv">Teams</button> ${o.stop ? '<button class="btn" id="stop">Stop</button>' : ""}</span></div>
+      <div class="bidbox" id="bb"></div><div class="tview" id="tview" hidden></div><div class="stage" id="stage"></div></div>`);
+    const draw = M => {
+      const l = M.lot, nm = id => esc(M.teams.find(t => t.id === id).name);
+      e.querySelector("#bb").innerHTML = l
+        ? `${esc(l.player.name)}<small>Next bid ${fmt(l.next)}${l.lead ? " · leading: " + nm(l.lead) : ""} · Lot ${M.done + 1}/${M.total}</small>`
+        : `Next player…<small>${M.done}/${M.total} done</small>`;
+      e.querySelector("#stage").innerHTML = M.view.map(v => {
+        const t = M.teams.find(x => x.id === v.id), p = M.purses[t.id], ok = o.canControl(t), d = f => ok && f ? "" : "disabled";
+        return `<div class="tp p-${PurseFactory.status(p, M.minP)}${v.lead ? " lead" : ""}" style="--tc:${t.color}">
+          <div class="tn">${esc(t.name)}<span>${ok && Net.code ? "You · " : ""}${v.status}</span></div>
+          <div class="pu">${fmt(p.remaining)}<small>${TeamFactory.filledCount(t)}/${t.slots.length} players</small></div>
+          <div class="tb"><button data-a="bid" data-id="${t.id}" ${d(v.canBid)}>Bid ${l ? fmt(l.next) : ""}</button>
+          <button data-a="skip" data-id="${t.id}" ${d(v.canSkip)}>Skip</button>
+          <button data-a="withdraw" data-id="${t.id}" ${d(v.canWithdraw)}>Withdraw</button></div></div>`; }).join("");
+      e.querySelector("#tview").innerHTML = M.teams.map(t => `<div class="tvt" style="--tc:${t.color}"><div class="tvh"><b>${esc(t.name)}</b><span>${fmt(M.purses[t.id].remaining)} left · overall ${TeamFactory.overall(t)}</span></div>
+        ${t.slots.map(s => `<div class="tvs"><em>${s.role}</em>${s.player ? esc(s.player.name) : "<i>empty</i>"}</div>`).join("")}</div>`).join("");
+    };
+    refresh = M => { if (e.isConnected) draw(M); };
+    e.querySelector("#stage").onclick = ev => { const b = ev.target.closest("button[data-a]"); if (b && !b.disabled) o.act(b.dataset.a, +b.dataset.id); };
+    e.querySelector("#tv").onclick = () => { const v = e.querySelector("#tview"); v.hidden = !v.hidden; };
+    if (o.stop) e.querySelector("#stop").onclick = o.stop;
+    draw(M0);
+    return e;
+  }
+  return { build, refresh: M => refresh(M) };
+})();
+
+const Online = (() => {
+  const L = { room: "", players: [], started: false, max: 4 };   // lobby: the host owns it and broadcasts it
+  let A = null, inGame = false, guestCard = null, guestLot = null, refreshLobby = () => {};
+  const me = () => L.players.find(p => p.id === Net.id);
+  const lobbyBc = () => { Net.send({ t: "lobby", L }); refreshLobby(); };
+
+  function leave() {
+    Net.h = {}; if (Net.ws) Net.ws.close();
+    Net.ws = null; Net.code = null; Net.id = null; A = null; inGame = false; guestCard = guestLot = null;
+    Screens.show("main");
+  }
+
+  function hostAct(kind, from) {                 // runs on the host: a player asks to bid/skip/withdraw for their own team
+    const team = A && A.teams.find(t => t.owner === from);
+    if (!team || !["bid", "skip", "withdraw"].includes(kind)) return;
+    const r = A[kind](team.id);
+    if (r && r.reason) { if (from === Net.id) toast(r.reason); else Net.send({ t: "toast", to: from, msg: r.reason }); }
+  }
+
+  function finish() {
+    const M = { teams: A.teams, purses: A.purses, results: A.results, finished: A.finished };
+    Net.send({ t: "end", M }); Screens.show("results", M);
+  }
+
+  function start() {
+    const cfg = RoomSettings.current, pal = TeamFactory.config.palette;
+    L.started = true; lobbyBc();
+    const names = shuffle(LocalTestMode.NAMES.slice()), used = new Set(L.players.map(p => p.color).filter(Boolean));
+    const teams = L.players.map(p => {
+      const c = p.color || shuffle(pal.filter(x => !used.has(x)))[0] || pal[0]; used.add(c);
+      return TeamFactory.create({ name: p.teamName.trim() || names.pop() || "Team " + p.id, color: c, owner: p.id, slotCount: cfg.slots });
+    });
+    A = AuctionFactory.create({ teams, purses: PurseFactory.createMany(teams, cfg.purse), pool: PlayerFactory.getAll(),
+      cardSeconds: cfg.timer > 0 ? cfg.timer : 15,
+      hooks: { onUpdate: () => { const M = modelOf(A); Net.send({ t: "snap", M }); GameView.refresh(M); },
+        onWarn: (t, w) => { const msg = t.name + ": " + w.message; toast(msg); Net.send({ t: "toast", msg }); },
+        onTransition: o => Net.send({ t: "tr", o }), onFinish: finish } });
+    inGame = true; Net.send({ t: "snap", M: modelOf(A) }); Screens.show("game", modelOf(A));
+    setTimeout(A.start, 0);
+  }
+
+  function syncCard(M) {                          // guests: mirror the host's bottom card and countdown
+    const l = M.lot;
+    if (!l) { SliderCardFactory.hide(); guestCard = guestLot = null; return; }
+    const label = l.bidding ? "Bidding" : "On the block";
+    if (guestLot !== l.player.id) { guestLot = l.player.id; guestCard = SliderCardFactory.showPlayer(l.player, M.left, { label }); }
+    else if (guestCard) guestCard.reset(M.left, label);
+  }
+
+  async function open(mode, o) {
+    try { await Net.connect(); } catch { toast("Can't reach the server. Add ?local to the address to test offline."); return; }
+    const cfg = RoomSettings.current;
+    Net.host = mode === "create"; inGame = false; L.started = false; L.players = [];
+    Net.h = {
+      created: m => { Net.id = m.id; Net.code = m.code; Object.assign(L, { room: cfg.name, max: cfg.players });
+        L.players = [{ id: m.id, name: o.name, teamName: "", color: "" }]; Screens.show("lobby"); },
+      joined: m => { Net.id = m.id; Net.code = m.code; Screens.show("lobby"); },
+      err: m => toast(m.msg),
+      "peer-join": m => { if (L.started || L.players.length >= L.max) return Net.send({ t: "full", to: m.id });
+        L.players.push({ id: m.id, name: m.name, teamName: "", color: "" }); lobbyBc(); },
+      "peer-left": m => { const p = L.players.find(x => x.id === m.id);
+        if (L.started) { if (p) toast(p.name + " left"); } else { L.players = L.players.filter(x => x.id !== m.id); lobbyBc(); } },
+      me: m => { const p = L.players.find(x => x.id === m.from); if (!p) return;
+        p.teamName = String(m.teamName || "").slice(0, 20); p.color = /^#[0-9a-f]{6}$/i.test(m.color) ? m.color : ""; lobbyBc(); },
+      act: m => hostAct(m.kind, m.from),
+      lobby: m => { Object.assign(L, m.L); refreshLobby(); },
+      full: () => { toast("Room is full or already started"); leave(); },
+      snap: m => { if (!inGame) { inGame = true; Screens.show("game", m.M); } else GameView.refresh(m.M); syncCard(m.M); },
+      tr: m => TransitionFactory.play(m.o),
+      toast: m => toast(m.msg),
+      end: m => Screens.show("results", m.M),
+      closed: () => { toast("Room closed"); leave(); }
+    };
+    Net.send(Net.host ? { t: "create" } : { t: "join", code: o.code, name: o.name });
+  }
+
+  function lobby() {
+    const pal = TeamFactory.config.palette;
+    const e = mk(`<div class="center"><div class="form wide"><h2 id="rn"></h2>
+      <p class="hint">Room code: <b class="code" style="padding:2px 10px">${esc(Net.code)}</b></p>
+      <p class="hint">Link: ${esc(location.origin)}/?join=${esc(Net.code)}</p>
+      <div id="pl" style="margin:14px 0"></div>
+      <div class="trow"><input type="text" id="tn" maxlength="20" placeholder="Your team name"><div class="sw" id="sw"></div></div>
+      <p class="hint" id="wait"></p><button class="btn primary" id="go">Start auction</button><button class="link" id="lv">Leave</button></div></div>`);
+    const tn = e.querySelector("#tn"), go = e.querySelector("#go");
+    const push = () => { const p = me(); if (!p) return; p.teamName = tn.value.slice(0, 20);
+      if (Net.host) lobbyBc(); else Net.send({ t: "me", teamName: p.teamName, color: p.color }); };
+    refreshLobby = () => {
+      if (!e.isConnected) return;
+      e.querySelector("#rn").textContent = L.room || "Room";
+      e.querySelector("#pl").innerHTML = L.players.map(p => `<div class="tvs"><i style="width:12px;height:12px;border-radius:50%;background:${p.color || "#444"};display:inline-block"></i>
+        <b>${esc(p.name)}</b> <em>${esc(p.teamName || "…")}</em>${p.id === Net.id ? " (you)" : ""}</div>`).join("");
+      const mine = me();
+      e.querySelector("#sw").innerHTML = pal.map(c => { const taken = L.players.some(p => p.id !== Net.id && p.color === c);
+        return `<button class="swatch${mine && mine.color === c ? " on" : ""}" data-c="${c}" style="background:${c};${taken ? "opacity:.2" : ""}" ${taken ? "disabled" : ""}></button>`; }).join("");
+      go.hidden = !Net.host; e.querySelector("#wait").textContent = Net.host ? L.players.length + " of " + L.max + " players joined. Empty team names are filled randomly." : "Waiting for the host to start…";
+    };
+    tn.oninput = push;
+    e.querySelector("#sw").onclick = ev => { const b = ev.target.closest("button[data-c]"); if (!b || b.disabled) return; const p = me(); if (p) { p.color = b.dataset.c; push(); refreshLobby(); } };
+    go.onclick = start; e.querySelector("#lv").onclick = leave;
+    setTimeout(refreshLobby, 0);
+    return e;
+  }
+
+  function game(M) {
+    return GameView.build(M, { act: (k, id) => { if (Net.host) hostAct(k, Net.id); else Net.send({ t: "act", kind: k }); },
+      stop: Net.host ? () => { A.stop(); finish(); } : null, canControl: t => t.owner === Net.id });
+  }
+
+  return { open, lobby, game, leave };
+})();
+
+/* ================= LocalTestMode =================
+   Temporary one-screen test harness. Set LocalTestMode.on = false (or delete this whole block plus the
+   last "register" line) and the create screen goes back to the normal room screen. The engine above
+   (Team/Purse/Bid/Skip/Withdraw/AuctionFactory) never touches this block. */
+const LocalTestMode = (() => {
+  const on = new URLSearchParams(location.search).has("local"), SETUP_SECONDS = 50;
+  const NAMES = ["Royal Strikers", "Night Owls", "Thunder Kings", "Desert Hawks", "Silver Foxes", "Iron Wolves", "Blue Comets",
+    "Red Dragons", "Golden Eagles", "Storm Riders", "Pink Panthers", "Green Mambas", "Sun Chasers", "Ice Breakers", "Wild Bulls", "Mighty Otters"];
+  const el = html => { const d = document.createElement("div"); d.innerHTML = html.trim(); return d.firstChild; };
+  const fmt = n => PurseFactory.format(n);
+  let session = null;
+
+  function setup() {
+    const r = RoomSettings.current, palette = TeamFactory.config.palette;
+    const teams = TeamFactory.createMany(r.teams, r.slots), colorSet = teams.map(() => false);
+    const rows = teams.map((t, i) => `<div class="trow"><input type="text" maxlength="20" placeholder="Team ${i + 1} name" data-i="${i}">
+      <div class="sw">${palette.map(c => `<button class="swatch" data-i="${i}" data-c="${c}" style="background:${c}" aria-label="Color ${c}"></button>`).join("")}</div></div>`).join("");
+    const e = el(`<div class="center"><div class="form wide"><h2>Name your teams</h2>
+      <p class="hint">Time left: <b id="left">${SETUP_SECONDS}s</b>. Anything left empty is filled randomly.</p>${rows}
+      <button class="btn primary" id="go" disabled>Start auction</button><button class="link" id="back">Back</button></div></div>`);
+    const inputs = [...e.querySelectorAll("input")], sw = [...e.querySelectorAll(".swatch")], go = e.querySelector("#go");
+    const taken = (c, i) => teams.some((t, j) => j !== i && colorSet[j] && t.color === c);
+    const paint = () => sw.forEach(b => { const i = +b.dataset.i; b.classList.toggle("on", colorSet[i] && teams[i].color === b.dataset.c);
+      b.disabled = taken(b.dataset.c, i); b.style.opacity = b.disabled ? .2 : 1; });
+    const ready = () => { go.disabled = !(inputs.every(x => x.value.trim()) && colorSet.every(Boolean)); };
+    inputs.forEach(x => x.oninput = ready);
+    sw.forEach(b => b.onclick = () => { const i = +b.dataset.i; if (taken(b.dataset.c, i)) return; teams[i].color = b.dataset.c; colorSet[i] = true; paint(); ready(); });
+    e.querySelector("#back").onclick = () => { clearInterval(timer); Screens.show("create"); };
+
+    let left = SETUP_SECONDS;
+    const timer = setInterval(() => {
+      if (!e.isConnected) return clearInterval(timer);
+      e.querySelector("#left").textContent = Math.max(--left, 0) + "s";
+      if (left > 0) return;
+      clearInterval(timer);
+      const used = new Set(inputs.map(x => x.value.trim().toLowerCase()).filter(Boolean));
+      const names = shuffle(NAMES.filter(n => !used.has(n.toLowerCase())));
+      inputs.forEach(x => { if (!x.value.trim()) x.value = names.pop() || "Team " + (+x.dataset.i + 1); });
+      teams.forEach((t, i) => { if (!colorSet[i]) { const free = palette.filter(c => !taken(c, i)); t.color = free[Math.floor(Math.random() * free.length)] || palette[0]; colorSet[i] = true; } });
+      paint(); ready(); toast("Time up: empty teams were filled randomly");
+    }, 1000);
+
+    go.onclick = () => {
+      clearInterval(timer);
+      teams.forEach((t, i) => { TeamFactory.setName(t, inputs[i].value); TeamFactory.setColor(t, t.color); });
+      session = { teams, purses: PurseFactory.createMany(teams, r.purse) };
+      Screens.show("auction");
+    };
+    paint();
+    return e;
+  }
+
+  function auction() {
+    const r = RoomSettings.current, { teams, purses } = session;
+    const A = AuctionFactory.create({ teams, purses, pool: PlayerFactory.getAll(), cardSeconds: r.timer > 0 ? r.timer : 15,
+      hooks: { onUpdate: () => GameView.refresh(modelOf(A)), onWarn: (t, w) => toast(t.name + ": " + w.message), onFinish: () => Screens.show("results", A) } });
+    session.A = A;
+    const e = GameView.build(modelOf(A), { act: (k, id) => { const x = A[k](id); if (x && x.reason) toast(x.reason); },
+      stop: () => { A.stop(); Screens.show("results", A); }, canControl: () => true });
+    setTimeout(A.start, 0);
+    return e;
+  }
+
+  function results(A) {
+    A = A || session.A;
+    const sold = A.results.filter(x => x.status === "sold"), unsold = A.results.filter(x => x.status !== "sold");
+    const e = el(`<div><div class="room"><h2>${A.finished ? "Auction complete" : "Auction stopped"}</h2><button class="btn" id="menu">Main menu</button></div>
+      ${A.teams.map(t => { const mine = sold.filter(x => x.teamId === t.id);
+        return `<div class="tvt" style="--tc:${t.color}"><div class="tvh"><b>${esc(t.name)}</b><span>${fmt(A.purses[t.id].remaining)} left</span></div>
+        ${mine.map(x => `<div class="tvs">${esc(x.player.name)} <em>${fmt(x.price)}</em></div>`).join("") || "<div class='tvs'><i>No players</i></div>"}</div>`; }).join("")}
+      <div class="tvt" style="--tc:var(--mute)"><div class="tvh"><b>Unsold</b></div>${unsold.map(x => `<div class="tvs">${esc(x.player.name)}</div>`).join("") || "<div class='tvs'><i>None</i></div>"}</div></div>`);
+    e.querySelector("#menu").onclick = () => Online.leave();
+    return e;
+  }
+
+  return { on, NAMES, setup, auction, results };
+})();
+
+["main", "create", "join", "room"].forEach(id => Screens.register(id, MenuFactory[id]));
+["setup", "auction", "results"].forEach(id => Screens.register(id, LocalTestMode[id]));
+Screens.register("lobby", Online.lobby); Screens.register("game", Online.game);
+Screens.show("main");
+</script>
+</body>
+</html>
