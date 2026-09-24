@@ -552,10 +552,23 @@ const MenuFactory = (() => {
     return e;
   }
 
+  function colorPicker(e, selector) {
+    const pal = TeamFactory.config.palette;
+    const box = e.querySelector(selector);
+    let chosen = pal[0];
+    box.innerHTML = pal.map(c => `<button type="button" class="swatch" data-c="${c}" style="background:${c}"></button>`).join("");
+    const paint = () => box.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.c === chosen));
+    box.onclick = ev => { const b = ev.target.closest("button[data-c]"); if (!b) return; chosen = b.dataset.c; paint(); };
+    paint();
+    return () => chosen;
+  }
+
   function create() {
     const e = el(`<div class="center"><div class="form"><h2>Create room</h2>
       <label>Room name</label><input type="text" id="name" maxlength="24" placeholder="Friday night auction">
       <label>Your name</label><input type="text" id="me" maxlength="16" placeholder="Your name">
+      <label>Your team name</label><input type="text" id="tn" maxlength="20" placeholder="Optional, filled randomly if blank">
+      <label>Your color</label><div class="sw" id="sw"></div>
       <label>Players <b id="pv">4</b></label><input type="range" id="p" min="1" max="10" value="4">
       <label>Teams <b id="tv">2</b></label><input type="range" id="t" min="1" max="10" value="2">
       <label>Slots per team <b id="kv">6</b></label><input type="range" id="k" min="3" max="12" value="6">
@@ -568,6 +581,7 @@ const MenuFactory = (() => {
       <button class="btn primary" id="go">Create</button>
       <button class="link" id="back">Back</button></div></div>`);
     const p = $(e, "#p"), t = $(e, "#t"), k = $(e, "#k"), s = $(e, "#s"), u = $(e, "#u"), un = $(e, "#un");
+    const getColor = colorPicker(e, "#sw");
     const purse = () => Math.max(1, +un.value || 0);
     const sync = () => {
       $(e, "#pv").textContent = p.value; $(e, "#tv").textContent = t.value;
@@ -584,7 +598,8 @@ const MenuFactory = (() => {
     $(e, "#go").onclick = () => {
       RoomSettings.current = { code: RoomSettings.newCode(), name: $(e, "#name").value.trim() || "Untitled room",
         players: +p.value, teams: +t.value, slots: +k.value, purse: purse(), timer: +s.value };
-      if (LocalTestMode.on) Screens.show("setup"); else Online.open("create", { name: $(e, "#me").value.trim() || "Host" });
+      if (LocalTestMode.on) Screens.show("setup"); else Online.open("create", {
+        name: $(e, "#me").value.trim() || "Host", teamName: $(e, "#tn").value.trim(), color: getColor() });
     };
     return e;
   }
@@ -593,12 +608,16 @@ const MenuFactory = (() => {
     const e = el(`<div class="center"><div class="form"><h2>Join room</h2>
       <label>Room code</label><input type="text" id="code" class="code-in" maxlength="4" placeholder="K7P2" autocomplete="off" value="${esc(new URLSearchParams(location.search).get("join") || "")}">
       <label>Your name</label><input type="text" id="me" maxlength="16" placeholder="Your name">
+      <label>Your team name</label><input type="text" id="tn" maxlength="20" placeholder="Optional, filled randomly if blank">
+      <label>Your color</label><div class="sw" id="sw"></div>
       <button class="btn primary" id="go">Join</button><button class="link" id="back">Back</button></div></div>`);
+    const getColor = colorPicker(e, "#sw");
     $(e, "#back").onclick = () => Screens.show("main");
     $(e, "#go").onclick = () => {
       const code = $(e, "#code").value.trim().toUpperCase();
       if (code.length < 4) { $(e, "#code").focus(); return; }
-      Online.open("join", { code, name: $(e, "#me").value.trim() || "Player" });
+      Online.open("join", { code, name: $(e, "#me").value.trim() || "Player",
+        teamName: $(e, "#tn").value.trim(), color: getColor() });
     };
     return e;
   }
@@ -726,15 +745,14 @@ const Online = (() => {
     Net.host = mode === "create"; inGame = false; L.started = false; L.players = [];
     Net.h = {
       created: m => { Net.id = m.id; Net.code = m.code; Object.assign(L, { room: cfg.name, max: cfg.players });
-        L.players = [{ id: m.id, name: o.name, teamName: "", color: "" }]; Screens.show("lobby"); },
+        L.players = [{ id: m.id, name: o.name, teamName: o.teamName || "", color: o.color || "" }]; Screens.show("lobby"); },
       joined: m => { Net.id = m.id; Net.code = m.code; Screens.show("lobby"); },
       err: m => toast(m.msg),
       "peer-join": m => { if (L.started || L.players.length >= L.max) return Net.send({ t: "full", to: m.id });
-        L.players.push({ id: m.id, name: m.name, teamName: "", color: "" }); lobbyBc(); },
+        L.players.push({ id: m.id, name: m.name, teamName: m.teamName || "", color: m.color || "" }); lobbyBc();
+        if (L.players.length >= L.max) start(); },
       "peer-left": m => { const p = L.players.find(x => x.id === m.id);
         if (L.started) { if (p) toast(p.name + " left"); } else { L.players = L.players.filter(x => x.id !== m.id); lobbyBc(); } },
-      me: m => { const p = L.players.find(x => x.id === m.from); if (!p) return;
-        p.teamName = String(m.teamName || "").slice(0, 20); p.color = /^#[0-9a-f]{6}$/i.test(m.color) ? m.color : ""; lobbyBc(); },
       act: m => hostAct(m.kind, m.from),
       lobby: m => { Object.assign(L, m.L); refreshLobby(); },
       full: () => { toast("Room is full or already started"); leave(); },
@@ -744,39 +762,30 @@ const Online = (() => {
       end: m => Screens.show("results", m.M),
       closed: () => { toast("Room closed"); leave(); }
     };
-    Net.send(Net.host ? { t: "create" } : { t: "join", code: o.code, name: o.name });
+    Net.send(Net.host ? { t: "create" } : { t: "join", code: o.code, name: o.name, teamName: o.teamName, color: o.color });
   }
 
   function lobby() {
-    const pal = TeamFactory.config.palette;
     const e = mk(`<div class="center"><div class="form wide"><h2 id="rn"></h2>
       <p class="hint">Room code: <b class="code" style="padding:2px 10px">${esc(Net.code)}</b></p>
       <p class="hint">Link: ${esc(location.origin)}/?join=${esc(Net.code)}</p>
       <div id="pl" style="margin:14px 0"></div>
-      <div class="trow"><input type="text" id="tn" maxlength="20" placeholder="Your team name"><div class="sw" id="sw"></div></div>
       <p class="hint" id="wait"></p><button class="btn primary" id="go">Start auction</button><button class="link" id="lv">Leave</button></div></div>`);
-    const tn = e.querySelector("#tn"), go = e.querySelector("#go");
-    const push = () => { const p = me(); if (!p) return; p.teamName = tn.value.slice(0, 20);
-      if (Net.host) lobbyBc(); else Net.send({ t: "me", teamName: p.teamName, color: p.color }); };
+    const go = e.querySelector("#go");
     refreshLobby = () => {
       if (!e.isConnected) return;
       e.querySelector("#rn").textContent = L.room || "Room";
       e.querySelector("#pl").innerHTML = L.players.map(p => `<div class="tvs"><i style="width:12px;height:12px;border-radius:50%;background:${p.color || "#444"};display:inline-block"></i>
         <b>${esc(p.name)}</b> <em>${esc(p.teamName || "…")}</em>${p.id === Net.id ? " (you)" : ""}</div>`).join("");
-      const mine = me();
-      e.querySelector("#sw").innerHTML = pal.map(c => { const taken = L.players.some(p => p.id !== Net.id && p.color === c);
-        return `<button class="swatch${mine && mine.color === c ? " on" : ""}" data-c="${c}" style="background:${c};${taken ? "opacity:.2" : ""}" ${taken ? "disabled" : ""}></button>`; }).join("");
       go.hidden = !Net.host;
       const enough = L.players.length >= 2;
       if (Net.host) go.disabled = !enough;
       e.querySelector("#wait").textContent = Net.host
         ? (enough
-            ? L.players.length + " of " + L.max + " players joined. Empty team names are filled randomly."
+            ? L.players.length + " of " + L.max + " players joined. Starts automatically once full, or start now."
             : "Waiting for at least one more player to join with code " + esc(Net.code) + "…")
         : "Waiting for the host to start…";
     };
-    tn.oninput = push;
-    e.querySelector("#sw").onclick = ev => { const b = ev.target.closest("button[data-c]"); if (!b || b.disabled) return; const p = me(); if (p) { p.color = b.dataset.c; push(); refreshLobby(); } };
     go.onclick = start; e.querySelector("#lv").onclick = leave;
     setTimeout(refreshLobby, 0);
     return e;
