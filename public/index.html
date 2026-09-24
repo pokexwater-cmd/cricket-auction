@@ -64,6 +64,8 @@
   .role{display:inline-block;margin-top:2px;font-size:.72rem;font-weight:600;padding:1px 8px;border-radius:99px;
     color:var(--c);border:1px solid var(--c)}
   .BAT{--c:var(--bat)}.BOWL{--c:var(--bowl)}.ALL{--c:var(--all)}
+  .STR{--c:var(--bowl)}.TAC{--c:var(--diamond)}.HYB{--c:var(--all)}
+  .src{display:block;font-size:.68rem;color:var(--mute);margin-top:1px}
   .stats{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px}
   .stat b{display:block;font-size:.95rem}
   .stat span{font-size:.68rem;color:var(--mute)}
@@ -72,18 +74,27 @@
   .price span{font-size:.68rem;color:var(--mute)}
 
   /* slider card (bottom of screen) */
-  .slider-host{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;padding:0 12px calc(12px + env(safe-area-inset-bottom,0px));pointer-events:none;z-index:50}
-  .slider-card{width:min(560px,100%);background:var(--panel);border:1px solid var(--gold);border-radius:12px;padding:10px 10px 0;
+  .slider-host{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;padding:0 10px calc(8px + env(safe-area-inset-bottom,0px));pointer-events:none;z-index:50}
+  .slider-card{width:min(360px,92%);background:var(--panel);border:1px solid var(--gold);border-radius:10px;padding:7px 8px 0;
     box-shadow:0 -8px 30px #000a;transform:translateY(130%);transition:transform .3s ease-out;overflow:hidden}
   .slider-card.in{transform:none}
-  .sc-head{display:flex;justify-content:space-between;align-items:baseline;padding:0 4px 8px;font-family:var(--head);letter-spacing:.06em}
-  .sc-head span{color:var(--gold);font-size:1.05rem}.sc-head b{font-size:1.2rem}
+  .sc-head{display:flex;justify-content:space-between;align-items:baseline;padding:0 2px 5px;font-family:var(--head);letter-spacing:.05em}
+  .sc-head span{color:var(--gold);font-size:.85rem}.sc-head b{font-size:.95rem}
   .slider-card .card{margin:0}
-  .sc-bar{height:4px;margin:10px -10px 0;background:var(--line)}
+  .slider-card .card .left{width:56px;padding:4px 0;gap:2px}
+  .slider-card .tier{font-size:.8rem}.slider-card .stars{font-size:.62rem}
+  .slider-card .card .body{padding:6px 8px}
+  .slider-card .name{font-size:.88rem}
+  .slider-card .role{font-size:.6rem;padding:0 6px;margin-top:1px}
+  .slider-card .stats{gap:2px 8px;margin-top:4px}
+  .slider-card .stat b{font-size:.72rem}.slider-card .stat span{font-size:.56rem}
+  .slider-card .price{padding:6px 8px}
+  .slider-card .price b{font-size:1rem}.slider-card .price span{font-size:.56rem}
+  .sc-bar{height:3px;margin:6px -8px 0;background:var(--line)}
   .sc-bar i{display:block;height:100%;background:var(--ball);animation:sc-shrink linear forwards}
   @keyframes sc-shrink{from{width:100%}to{width:0}}
   @media(prefers-reduced-motion:reduce){.slider-card{transition:none}}
-  #players{padding-bottom:230px}
+  #players{padding-bottom:160px}
 
   /* team setup, auction stage, transition */
   .wide{width:min(640px,100%)!important}
@@ -171,51 +182,144 @@ function toast(msg) {
 }
 
 /* ================= PlayerFactory =================
-   Add a player: one create(...) line. Add a tier: one line in TIERS.
-   Base price comes from the star rating (RATING_PRICE), not random. */
+   Two switchable packs (GameMode.current, set at the bottom of this block): "cricket" (real players)
+   or "anime" (200+ characters). Add a cricket player: one create(...) line in seedCricket(). Add anime
+   characters: one entry in ANIME_GROUPS (name + power tier D/G/S/B) - stats/base price are generated
+   from the tier automatically, so there's nothing else to fill in. */
 const PlayerFactory = (() => {
-  const ROLES = { ALL: "All-rounder", BAT: "Batsman", BOWL: "Bowler" };   // order = who gets extra team slots first
   const TIERS = { diamond: "Diamond", gold: "Gold", silver: "Silver", bronze: "Bronze" };
   const RATING_PRICE = { 5: 2.0, 4: 1.5, 3: 1.0, 2: 0.5, 1: 0.2 };   // crore
 
-  const STAT_SCHEMA = {
-    BAT:  { matches: "Matches", runs: "Runs", average: "Bat avg", strikeRate: "Strike rate", hundreds: "100s" },
-    BOWL: { matches: "Matches", wickets: "Wickets", average: "Bowl avg", economy: "Economy", best: "Best" },
-    ALL:  { runs: "Runs", batAvg: "Bat avg", wickets: "Wickets", economy: "Economy", matches: "Matches" }
+  const MODES = {
+    cricket: {
+      roles: { ALL: "All-rounder", BAT: "Batsman", BOWL: "Bowler" },
+      stats: {
+        BAT:  { matches: "Matches", runs: "Runs", average: "Bat avg", strikeRate: "Strike rate", hundreds: "100s" },
+        BOWL: { matches: "Matches", wickets: "Wickets", average: "Bowl avg", economy: "Economy", best: "Best" },
+        ALL:  { runs: "Runs", batAvg: "Bat avg", wickets: "Wickets", economy: "Economy", matches: "Matches" }
+      }
+    },
+    anime: {
+      roles: { HYB: "All-Rounder", STR: "Powerhouse", TAC: "Tactician" },
+      stats: {
+        STR: { power: "Power", speed: "Speed", move: "Signature move" },
+        TAC: { skill: "Skill", strategy: "Strategy", move: "Signature move" },
+        HYB: { power: "Power", skill: "Skill", move: "Signature move" }
+      }
+    }
   };
 
-  let nextId = 1;
-  const list = [];
+  let mode = "cricket", ROLES = MODES.cricket.roles, STAT_SCHEMA = MODES.cricket.stats;
+  let nextId = 1, list = [];
 
-  function create(name, role, tier, rating, stats) {
+  function create(name, role, tier, rating, stats, source) {
     if (!ROLES[role]) throw new Error("Unknown role: " + role);
     if (!TIERS[tier]) throw new Error("Unknown tier: " + tier);
     if (!RATING_PRICE[rating]) throw new Error("Rating must be 1-5");
     const clean = {};
     for (const k in STAT_SCHEMA[role]) clean[k] = stats[k] ?? "-";
     const p = { id: nextId++, name, role, roleLabel: ROLES[role], tier, tierLabel: TIERS[tier],
-                rating, basePrice: RATING_PRICE[rating], stats: clean };
+                rating, basePrice: RATING_PRICE[rating], stats: clean, source: source || "" };
     list.push(p);
     return p;
   }
 
-  //            name                 role    tier       ★  stats
-  create("Virat Kohli",       "BAT",  "diamond", 5, { matches: 252, runs: 8004, average: 38.7, strikeRate: 131.9, hundreds: 8 });
-  create("Rohit Sharma",      "BAT",  "diamond", 5, { matches: 257, runs: 6628, average: 29.7, strikeRate: 130.4, hundreds: 2 });
-  create("Jasprit Bumrah",    "BOWL", "diamond", 5, { matches: 133, wickets: 165, average: 22.5, economy: 7.4, best: "5/10" });
-  create("Suryakumar Yadav",  "BAT",  "gold",    4, { matches: 150, runs: 3594, average: 32.0, strikeRate: 145.5, hundreds: 2 });
-  create("Hardik Pandya",     "ALL",  "gold",    4, { runs: 2525, batAvg: 27.5, wickets: 64,  economy: 9.1, matches: 137 });
-  create("Ravindra Jadeja",   "ALL",  "gold",    4, { runs: 2959, batAvg: 27.4, wickets: 160, economy: 7.6, matches: 240 });
-  create("Rashid Khan",       "BOWL", "gold",    4, { matches: 121, wickets: 149, average: 22.0, economy: 6.8, best: "3/19" });
-  create("Andre Russell",     "ALL",  "silver",  3, { runs: 2484, batAvg: 28.5, wickets: 115, economy: 9.2, matches: 140 });
-  create("Trent Boult",       "BOWL", "silver",  3, { matches: 100, wickets: 120, average: 26.0, economy: 8.3, best: "4/18" });
-  create("Yuzvendra Chahal",  "BOWL", "silver",  3, { matches: 160, wickets: 205, average: 22.0, economy: 7.9, best: "5/40" });
-  create("Tilak Varma",       "BAT",  "bronze",  2, { matches: 50, runs: 1400, average: 36.0, strikeRate: 143.0, hundreds: 0 });
-  create("Harshit Rana",      "BOWL", "bronze",  1, { matches: 25, wickets: 30, average: 26.0, economy: 9.3, best: "3/33" });
+  function seedCricket() {
+    //            name                 role    tier       ★  stats
+    create("Virat Kohli",       "BAT",  "diamond", 5, { matches: 252, runs: 8004, average: 38.7, strikeRate: 131.9, hundreds: 8 });
+    create("Rohit Sharma",      "BAT",  "diamond", 5, { matches: 257, runs: 6628, average: 29.7, strikeRate: 130.4, hundreds: 2 });
+    create("Jasprit Bumrah",    "BOWL", "diamond", 5, { matches: 133, wickets: 165, average: 22.5, economy: 7.4, best: "5/10" });
+    create("Suryakumar Yadav",  "BAT",  "gold",    4, { matches: 150, runs: 3594, average: 32.0, strikeRate: 145.5, hundreds: 2 });
+    create("Hardik Pandya",     "ALL",  "gold",    4, { runs: 2525, batAvg: 27.5, wickets: 64,  economy: 9.1, matches: 137 });
+    create("Ravindra Jadeja",   "ALL",  "gold",    4, { runs: 2959, batAvg: 27.4, wickets: 160, economy: 7.6, matches: 240 });
+    create("Rashid Khan",       "BOWL", "gold",    4, { matches: 121, wickets: 149, average: 22.0, economy: 6.8, best: "3/19" });
+    create("Andre Russell",     "ALL",  "silver",  3, { runs: 2484, batAvg: 28.5, wickets: 115, economy: 9.2, matches: 140 });
+    create("Trent Boult",       "BOWL", "silver",  3, { matches: 100, wickets: 120, average: 26.0, economy: 8.3, best: "4/18" });
+    create("Yuzvendra Chahal",  "BOWL", "silver",  3, { matches: 160, wickets: 205, average: 22.0, economy: 7.9, best: "5/40" });
+    create("Tilak Varma",       "BAT",  "bronze",  2, { matches: 50, runs: 1400, average: 36.0, strikeRate: 143.0, hundreds: 0 });
+    create("Harshit Rana",      "BOWL", "bronze",  1, { matches: 25, wickets: 30, average: 26.0, economy: 9.3, best: "3/33" });
+  }
+
+  // ---- Anime pack: 200 characters across 20 shows. Tier letters = in-universe power: D(iamond)
+  // = top-of-verse, G(old) = arc-level strong, S(ilver) = solid fighter, B(ronze) = supporting cast. ----
+  const TIER_KEY = { D: "diamond", G: "gold", S: "silver", B: "bronze" };
+  const TIER_RATING = { D: 5, G: 4, S: 3, B: 2 };
+  const SIGNATURES = {
+    "Goku": "Kamehameha", "Vegeta": "Final Flash", "Beerus": "Hakai", "Broly": "Gigantic Roar", "Frieza": "Death Beam",
+    "Naruto": "Rasengan", "Sasuke": "Amaterasu", "Madara": "Susanoo", "Kaguya": "All-Killing Ash Bones",
+    "Ichigo": "Getsuga Tensho", "Yhwach": "Almighty", "Aizen": "Kyoka Suigetsu",
+    "Luffy": "Gear Five", "Shanks": "Conqueror's Haki", "Kaido": "Thunder Bagua",
+    "All Might": "United States of Smash", "All For One": "Quirk Theft",
+    "Saitama": "Serious Punch", "Blast": "Unmeasurable Power",
+    "Eren": "Founding Titan Roar", "Levi": "Blade Dance",
+    "Muzan": "Demon Curse", "Akaza": "Destructive Death",
+    "Gojo": "Hollow Purple", "Sukuna": "Malevolent Shrine", "Toji": "Heavenly Restriction", "Yuta": "Cursed Copy",
+    "Meruem": "Ultimate Nen Weapon", "Netero": "100-Type Guanyin Bodhisattva", "Chrollo": "Skill Hunter", "Neferpitou": "Doctor Blythe",
+    "Father": "Philosopher's Stone", "Licht": "Mana Zone", "Julius": "Time Stop",
+    "Gildarts": "Crash Magic", "Zeref": "Death Magic", "Acnologia": "Dragon King's Rage",
+    "Charon": "Hellfire", "Toguro": "100% True Power", "Sensui": "Seven Chapters",
+    "Dio": "The World", "Kars": "Ultimate Lifeform", "Pucci": "Made In Heaven",
+    "Makima": "Control Devil", "Kishibe": "Blade Mastery",
+    "Guts": "Dragon Slayer Swing", "Griffith": "Wings of Femto", "Zodd": "Apostle Rage",
+    "Arima": "Quinque Mastery", "Eto": "One-Eyed Owl", "Mob": "100% Explosion"
+  };
+  const ANIME_GROUPS = {
+    "Dragon Ball": [["Goku","D"],["Vegeta","D"],["Beerus","D"],["Broly","D"],["Frieza","D"],["Gohan","G"],["Piccolo","G"],["Trunks","G"],["Android 18","S"],["Krillin","B"]],
+    "Naruto": [["Naruto","D"],["Sasuke","D"],["Madara","D"],["Kaguya","D"],["Itachi","G"],["Kakashi","G"],["Jiraiya","G"],["Gaara","S"],["Rock Lee","S"],["Hinata","B"]],
+    "Bleach": [["Ichigo","D"],["Yhwach","D"],["Aizen","D"],["Kenpachi","G"],["Byakuya","G"],["Rukia","S"],["Toshiro","S"],["Orihime","B"],["Renji","S"],["Uryu","S"]],
+    "One Piece": [["Luffy","D"],["Shanks","D"],["Kaido","D"],["Zoro","G"],["Sanji","G"],["Law","G"],["Ace","S"],["Nami","B"],["Usopp","B"],["Chopper","B"]],
+    "My Hero Academia": [["All Might","D"],["All For One","D"],["Deku","G"],["Bakugo","G"],["Endeavor","G"],["Shigaraki","G"],["Shoto","S"],["Ochaco","S"],["Iida","B"],["Tsuyu","B"]],
+    "One Punch Man": [["Saitama","D"],["Blast","D"],["Genos","G"],["Garou","G"],["Tatsumaki","G"],["Bang","S"],["Fubuki","S"],["Sonic","S"],["King","B"],["Mumen Rider","B"]],
+    "Attack on Titan": [["Eren","D"],["Levi","D"],["Mikasa","G"],["Reiner","G"],["Zeke","G"],["Armin","S"],["Annie","S"],["Erwin","S"],["Hange","S"],["Historia","B"]],
+    "Demon Slayer": [["Muzan","D"],["Akaza","D"],["Rengoku","G"],["Giyu","G"],["Tanjiro","S"],["Nezuko","S"],["Zenitsu","S"],["Inosuke","S"],["Shinobu","S"],["Gyutaro","G"]],
+    "Jujutsu Kaisen": [["Gojo","D"],["Sukuna","D"],["Toji","D"],["Yuta","D"],["Yuji","G"],["Megumi","G"],["Mahito","G"],["Nobara","S"],["Nanami","S"],["Maki","S"]],
+    "Hunter x Hunter": [["Meruem","D"],["Netero","D"],["Chrollo","D"],["Neferpitou","D"],["Gon","G"],["Killua","G"],["Hisoka","G"],["Kurapika","G"],["Illumi","S"],["Leorio","B"]],
+    "Fullmetal Alchemist": [["Father","D"],["Edward","G"],["Alphonse","G"],["Roy Mustang","G"],["Scar","G"],["Armstrong","S"],["Envy","S"],["Izumi","S"],["Greed","S"],["Hawkeye","B"]],
+    "Black Clover": [["Licht","D"],["Julius","D"],["Asta","G"],["Yuno","G"],["Yami","G"],["Mereoleona","G"],["Noelle","S"],["Nacht","S"],["Fuegoleon","S"],["Finral","B"]],
+    "Fairy Tail": [["Gildarts","D"],["Zeref","D"],["Acnologia","D"],["Natsu","G"],["Erza","G"],["Laxus","G"],["Gray","S"],["Mirajane","S"],["Lucy","B"],["Wendy","B"]],
+    "Fire Force": [["Charon","D"],["Shinra","G"],["Benimaru","G"],["Shinmon","G"],["Sho","G"],["Arthur","S"],["Maki","S"],["Obi","S"],["Iris","B"],["Vulcan","B"]],
+    "Tokyo Ghoul": [["Arima","D"],["Eto","D"],["Kaneki","G"],["Touka","S"],["Amon","S"],["Juuzou","S"],["Ayato","S"],["Nishiki","S"],["Tsukiyama","B"],["Hide","B"]],
+    "Mob Psycho 100": [["Mob","D"],["Toichiro","D"],["Serizawa","S"],["Teru","S"],["Ekubo","S"],["Musashi","S"],["Reigen","B"],["Dimple","B"],["Ritsu","B"],["Sakurai","B"]],
+    "Yu Yu Hakusho": [["Toguro","D"],["Sensui","D"],["Yomi","D"],["Yusuke","G"],["Hiei","G"],["Kurama","G"],["Kuwabara","S"],["Genkai","S"],["Botan","B"],["Koenma","B"]],
+    "JoJo's Bizarre Adventure": [["Dio","D"],["Kars","D"],["Pucci","D"],["Jotaro","G"],["Josuke","G"],["Giorno","G"],["Jonathan","S"],["Joseph","S"],["Polnareff","S"],["Kakyoin","S"]],
+    "Chainsaw Man": [["Makima","D"],["Kishibe","D"],["Denji","G"],["Power","G"],["Quanxi","G"],["Aki","S"],["Reze","S"],["Himeno","S"],["Angel Devil","S"],["Beam","B"]],
+    "Berserk": [["Guts","D"],["Griffith","D"],["Zodd","D"],["Casca","S"],["Serpico","S"],["Schierke","S"],["Farnese","B"],["Rickert","B"],["Judeau","B"],["Puck","B"]]
+  };
+
+  function seedAnime() {
+    const roles = Object.keys(ROLES); let i = 0;
+    const bonus = { diamond: 14, gold: 7, silver: 3, bronze: 0 };
+    Object.entries(ANIME_GROUPS).forEach(([anime, cast]) => {
+      cast.forEach(([name, tk]) => {
+        const role = roles[i++ % roles.length], tier = TIER_KEY[tk], rating = TIER_RATING[tk];
+        const val = Math.min(100, rating * 16 + bonus[tier]);
+        const sec = Math.max(15, val - 12 - (name.length % 11));
+        const move = SIGNATURES[name] || `${name}'s signature technique`;
+        const stats = role === "STR" ? { power: val, speed: sec, move }
+                    : role === "TAC" ? { skill: val, strategy: sec, move }
+                    : { power: val, skill: sec, move };
+        create(name, role, tier, rating, stats, anime);
+      });
+    });
+  }
+
+  function setMode(m) {
+    if (!MODES[m]) throw new Error("Unknown mode: " + m);
+    mode = m; ROLES = MODES[m].roles; STAT_SCHEMA = MODES[m].stats; list = []; nextId = 1;
+    if (m === "cricket") seedCricket(); else seedAnime();
+  }
+  setMode("cricket");
 
   return { create, roles: () => Object.keys(ROLES), roleLabel: r => ROLES[r], getAll: () => list.slice(), getById: id => list.find(p => p.id === id),
-           getByTier: t => list.filter(p => p.tier === t), labelsFor: r => STAT_SCHEMA[r] };
+           getByTier: t => list.filter(p => p.tier === t), labelsFor: r => STAT_SCHEMA[r], setMode, mode: () => mode, modes: () => Object.keys(MODES) };
 })();
+
+// Switches the whole game's character pool. "cricket" = the players above; "anime" = the 200-character
+// pack (Dragon Ball, Naruto, One Piece, MHA, JJK, HxH and more), each ranked by in-universe power and
+// randomly ordered into the auction queue by AuctionFactory's shuffle - no two rooms see the same order.
+// No UI toggle by design (per your request) - flip this one line and redeploy.
+const GameMode = { current: "cricket" };
+PlayerFactory.setMode(GameMode.current);
 
 /* ================= TeamFactory =================
    Not used by the UI yet. Teams are plain data (safe to send over sockets);
@@ -403,7 +507,7 @@ function renderPlayerCard(p) {
   const stars = "★".repeat(p.rating) + `<i>${"★".repeat(5 - p.rating)}</i>`;
   return `<div class="card T-${p.tier}">
     <div class="left"><div class="tier">${p.tierLabel}</div><div class="stars">${stars}</div></div>
-    <div class="body"><div class="name">${p.name}</div><span class="role ${p.role}">${p.roleLabel}</span>
+    <div class="body"><div class="name">${p.name}${p.source ? `<span class="src">${esc(p.source)}</span>` : ""}</div><span class="role ${p.role}">${p.roleLabel}</span>
       <div class="stats">${stats}</div></div>
     <div class="price"><b>${p.basePrice.toFixed(1)} Cr</b><span>Base price</span></div>
   </div>`;
@@ -726,7 +830,7 @@ const GameView = (() => {
   }
 
   function build(M0, o) {                 // o: { act(kind, teamId), stop?, canControl(team) }
-    const e = mk(`<div style="padding-bottom:220px"><div class="room"><h2>Auction</h2><span class="toprow"><button class="btn" id="tv">Standings</button> ${o.stop ? '<button class="btn" id="stop">Stop</button>' : ""}</span></div>
+    const e = mk(`<div style="padding-bottom:150px"><div class="room"><h2>Auction</h2><span class="toprow"><button class="btn" id="tv">Standings</button> ${o.stop ? '<button class="btn" id="stop">Stop</button>' : ""}</span></div>
       <div class="standings" id="standings" hidden></div>
       <div class="bidbox" id="bb"></div>
       <div id="mine"></div>
