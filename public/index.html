@@ -25,6 +25,7 @@
   h1{font-family:var(--head);font-size:clamp(2.6rem,9vw,4.6rem);line-height:1;margin:0;letter-spacing:.02em}
   .sub{color:var(--mute);margin:10px 0 34px}
   .menu-btns{display:flex;flex-direction:column;gap:12px;width:min(320px,100%)}
+  .btn:disabled{opacity:.35;cursor:not-allowed}
   .btn{padding:15px 20px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--text);
     font-family:var(--head);font-size:1.2rem;letter-spacing:.05em}
   .btn.primary{background:var(--ball);border-color:var(--ball)}
@@ -765,7 +766,14 @@ const Online = (() => {
       const mine = me();
       e.querySelector("#sw").innerHTML = pal.map(c => { const taken = L.players.some(p => p.id !== Net.id && p.color === c);
         return `<button class="swatch${mine && mine.color === c ? " on" : ""}" data-c="${c}" style="background:${c};${taken ? "opacity:.2" : ""}" ${taken ? "disabled" : ""}></button>`; }).join("");
-      go.hidden = !Net.host; e.querySelector("#wait").textContent = Net.host ? L.players.length + " of " + L.max + " players joined. Empty team names are filled randomly." : "Waiting for the host to start…";
+      go.hidden = !Net.host;
+      const enough = L.players.length >= 2;
+      if (Net.host) go.disabled = !enough;
+      e.querySelector("#wait").textContent = Net.host
+        ? (enough
+            ? L.players.length + " of " + L.max + " players joined. Empty team names are filled randomly."
+            : "Waiting for at least one more player to join with code " + esc(Net.code) + "…")
+        : "Waiting for the host to start…";
     };
     tn.oninput = push;
     e.querySelector("#sw").onclick = ev => { const b = ev.target.closest("button[data-c]"); if (!b || b.disabled) return; const p = me(); if (p) { p.color = b.dataset.c; push(); refreshLobby(); } };
