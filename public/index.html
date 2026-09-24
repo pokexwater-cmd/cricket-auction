@@ -93,9 +93,6 @@
   .swatch.on{border-color:#fff}
   .bidbox{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:14px;font-family:var(--head);font-size:1.5rem}
   .bidbox small{color:var(--mute);font-family:system-ui,sans-serif;font-size:.8rem;margin-left:8px}
-  .stage{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;padding-bottom:270px}
-  .tp{background:var(--card);border:1px solid var(--line);border-top:4px solid var(--tc);border-radius:10px;padding:10px 12px}
-  .tp.lead{box-shadow:0 0 0 2px var(--gold)}
   .tn{display:flex;justify-content:space-between;gap:8px;font-weight:700}
   .tn span{font-size:.75rem;color:var(--mute);font-weight:600}
   .pu{margin:6px 0;font-family:var(--head);font-size:1.25rem}
@@ -122,6 +119,41 @@
   .tr-in p{margin:0;color:var(--mute)}
   @media(prefers-reduced-motion:reduce){.tr{transition:none}}
   @media(max-width:420px){#players{grid-template-columns:1fr}}
+
+  /* per-player game screen */
+  .mybox{background:var(--card);border:1px solid var(--gold);border-top:5px solid var(--tc);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+  .mybox .tn{font-family:var(--head);font-size:1.3rem;display:flex;justify-content:space-between;align-items:baseline}
+  .mybox .tn span{font-family:system-ui,sans-serif;font-size:.85rem;color:var(--mute);font-weight:600}
+  .mybox .pu{font-family:var(--head);font-size:1.6rem;margin:4px 0}
+  .mybox .pu small{font-family:system-ui,sans-serif;color:var(--mute);font-size:.75rem;display:block;font-weight:400}
+  .mybox .tb button{padding:14px 6px;font-size:.95rem;border-radius:8px}
+  .mybox .tb button[data-a=bid]{font-size:1.05rem}
+  .oprows{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+  .oprow{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--panel);border:1px solid var(--line);
+    border-left:4px solid var(--tc);border-radius:8px;padding:8px 12px;font-size:.9rem}
+  .oprow.lead{border-left-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
+  .oprow b{font-weight:700}.oprow em{font-style:normal;color:var(--mute);font-size:.78rem}
+  .standings{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 12px;margin-bottom:16px}
+  .standings[hidden]{display:none}
+  .srow{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+  .srow:last-child{border-bottom:0}
+  .srow .rk{font-family:var(--head);font-size:1.1rem;color:var(--gold);width:22px}
+  .srow .sn{flex:1;font-weight:700}.srow .sn small{display:block;font-weight:400;color:var(--mute);font-size:.72rem}
+  .srow .sc{font-family:var(--head);font-size:1.15rem}
+  .toprow{display:flex;gap:8px;flex-wrap:wrap}
+
+  /* results / celebration */
+  .res-hero{text-align:center;padding:34px 16px 18px}
+  .res-hero h1{font-family:var(--head);font-size:clamp(2.2rem,10vw,3.6rem);margin:6px 0;color:var(--gold)}
+  .res-hero.lose h1{color:var(--mute)}
+  .res-hero p{color:var(--mute);margin:0}
+  .confetti-wrap{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:5}
+  .confetti{position:absolute;top:-20px;width:8px;height:14px;opacity:.9;animation:conf-fall linear forwards}
+  @keyframes conf-fall{to{transform:translateY(110vh) rotate(540deg);opacity:.3}}
+  .res-score{font-family:var(--head);font-size:2.2rem;text-align:center;color:var(--text);margin:6px 0 2px}
+  .res-why{max-width:420px;margin:0 auto 20px;text-align:center;color:var(--mute);font-size:.88rem}
+  .res-mine{border-color:var(--gold)!important;box-shadow:0 0 0 2px var(--gold)}
+  .res-opp{opacity:.8}
 </style>
 </head>
 <body>
@@ -251,6 +283,46 @@ const TeamFactory = (() => {
 
   return { config, roleQuota, create, createMany, addPlayer, removePlayer, slotScore, overall,
            roleCounts, filledCount, isFull, setName, setColor };
+})();
+
+/* ================= RankFactory =================
+   Ranks teams by squad quality: star level (how good the players are) plus role
+   diversity (how balanced batsmen/bowlers/all-rounders are, not stacked in one role).
+   Reuses TeamFactory's slot/player data - no new state, just scoring. */
+const RankFactory = (() => {
+  const config = { starWeight: 0.65, diversityWeight: 0.35 };
+
+  function starScore(team) {
+    const filled = team.slots.filter(s => s.player);
+    if (!filled.length) return 0;
+    return Math.round(100 * filled.reduce((sum, s) => sum + s.player.rating / 5, 0) / filled.length);
+  }
+
+  // 100 = every role filled in equal proportion to the team's quota; stacking one role pulls it down.
+  function diversityScore(team) {
+    const counts = TeamFactory.roleCounts(team), roles = Object.keys(team.quota);
+    const filled = TeamFactory.filledCount(team);
+    if (!filled) return 0;
+    let penalty = 0;
+    roles.forEach(r => { const want = team.quota[r] ? team.quota[r] / team.slots.length : 0;
+      penalty += Math.abs((counts[r] || 0) / filled - want); });
+    return Math.round(100 * Math.max(0, 1 - penalty / 2));
+  }
+
+  function score(team) {
+    const stars = starScore(team), diversity = diversityScore(team);
+    const total = Math.round(stars * config.starWeight + diversity * config.diversityWeight);
+    return { stars, diversity, total };
+  }
+
+  // Sorted best -> worst, each entry: { team, stars, diversity, total, rank }
+  function rank(teams) {
+    return teams.map(t => ({ team: t, ...score(t) }))
+      .sort((a, b) => b.total - a.total)
+      .map((r, i) => ({ ...r, rank: i + 1 }));
+  }
+
+  return { config, score, rank };
 })();
 
 /* ================= PurseFactory =================
@@ -552,23 +624,10 @@ const MenuFactory = (() => {
     return e;
   }
 
-  function colorPicker(e, selector) {
-    const pal = TeamFactory.config.palette;
-    const box = e.querySelector(selector);
-    let chosen = pal[0];
-    box.innerHTML = pal.map(c => `<button type="button" class="swatch" data-c="${c}" style="background:${c}"></button>`).join("");
-    const paint = () => box.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.c === chosen));
-    box.onclick = ev => { const b = ev.target.closest("button[data-c]"); if (!b) return; chosen = b.dataset.c; paint(); };
-    paint();
-    return () => chosen;
-  }
-
   function create() {
     const e = el(`<div class="center"><div class="form"><h2>Create room</h2>
       <label>Room name</label><input type="text" id="name" maxlength="24" placeholder="Friday night auction">
-      <label>Your name</label><input type="text" id="me" maxlength="16" placeholder="Your name">
-      <label>Your team name</label><input type="text" id="tn" maxlength="20" placeholder="Optional, filled randomly if blank">
-      <label>Your color</label><div class="sw" id="sw"></div>
+      <label>Your team name</label><input type="text" id="tn" maxlength="20" placeholder="e.g. Royal Strikers">
       <label>Players <b id="pv">4</b></label><input type="range" id="p" min="1" max="10" value="4">
       <label>Teams <b id="tv">2</b></label><input type="range" id="t" min="1" max="10" value="2">
       <label>Slots per team <b id="kv">6</b></label><input type="range" id="k" min="3" max="12" value="6">
@@ -581,7 +640,6 @@ const MenuFactory = (() => {
       <button class="btn primary" id="go">Create</button>
       <button class="link" id="back">Back</button></div></div>`);
     const p = $(e, "#p"), t = $(e, "#t"), k = $(e, "#k"), s = $(e, "#s"), u = $(e, "#u"), un = $(e, "#un");
-    const getColor = colorPicker(e, "#sw");
     const purse = () => Math.max(1, +un.value || 0);
     const sync = () => {
       $(e, "#pv").textContent = p.value; $(e, "#tv").textContent = t.value;
@@ -598,8 +656,9 @@ const MenuFactory = (() => {
     $(e, "#go").onclick = () => {
       RoomSettings.current = { code: RoomSettings.newCode(), name: $(e, "#name").value.trim() || "Untitled room",
         players: +p.value, teams: +t.value, slots: +k.value, purse: purse(), timer: +s.value };
+      const tn = $(e, "#tn").value.trim();
       if (LocalTestMode.on) Screens.show("setup"); else Online.open("create", {
-        name: $(e, "#me").value.trim() || "Host", teamName: $(e, "#tn").value.trim(), color: getColor() });
+        name: tn || "Host", teamName: tn, color: "" });
     };
     return e;
   }
@@ -607,17 +666,14 @@ const MenuFactory = (() => {
   function join() {
     const e = el(`<div class="center"><div class="form"><h2>Join room</h2>
       <label>Room code</label><input type="text" id="code" class="code-in" maxlength="4" placeholder="K7P2" autocomplete="off" value="${esc(new URLSearchParams(location.search).get("join") || "")}">
-      <label>Your name</label><input type="text" id="me" maxlength="16" placeholder="Your name">
-      <label>Your team name</label><input type="text" id="tn" maxlength="20" placeholder="Optional, filled randomly if blank">
-      <label>Your color</label><div class="sw" id="sw"></div>
+      <label>Your team name</label><input type="text" id="tn" maxlength="20" placeholder="e.g. Night Owls">
       <button class="btn primary" id="go">Join</button><button class="link" id="back">Back</button></div></div>`);
-    const getColor = colorPicker(e, "#sw");
     $(e, "#back").onclick = () => Screens.show("main");
     $(e, "#go").onclick = () => {
       const code = $(e, "#code").value.trim().toUpperCase();
       if (code.length < 4) { $(e, "#code").focus(); return; }
-      Online.open("join", { code, name: $(e, "#me").value.trim() || "Player",
-        teamName: $(e, "#tn").value.trim(), color: getColor() });
+      const tn = $(e, "#tn").value.trim();
+      Online.open("join", { code, name: tn || "Player", teamName: tn, color: "" });
     };
     return e;
   }
@@ -661,33 +717,52 @@ const modelOf = A => {
 const GameView = (() => {
   let refresh = () => {};
   const fmt = n => PurseFactory.format(n);
+
+  function standingsHtml(teams) {
+    return RankFactory.rank(teams).map(r => `<div class="srow">
+      <div class="rk">#${r.rank}</div>
+      <div class="sn" style="color:${r.team.color}">${esc(r.team.name)}<small>${r.stars}★ level · ${r.diversity} balance</small></div>
+      <div class="sc">${r.total}</div></div>`).join("");
+  }
+
   function build(M0, o) {                 // o: { act(kind, teamId), stop?, canControl(team) }
-    const e = mk(`<div><div class="room"><h2>Auction</h2><span><button class="btn" id="tv">Teams</button> ${o.stop ? '<button class="btn" id="stop">Stop</button>' : ""}</span></div>
-      <div class="bidbox" id="bb"></div><div class="tview" id="tview" hidden></div><div class="stage" id="stage"></div></div>`);
+    const e = mk(`<div style="padding-bottom:220px"><div class="room"><h2>Auction</h2><span class="toprow"><button class="btn" id="tv">Standings</button> ${o.stop ? '<button class="btn" id="stop">Stop</button>' : ""}</span></div>
+      <div class="standings" id="standings" hidden></div>
+      <div class="bidbox" id="bb"></div>
+      <div id="mine"></div>
+      <div class="oprows" id="ops"></div></div>`);
     const draw = M => {
       const l = M.lot, nm = id => esc(M.teams.find(t => t.id === id).name);
       e.querySelector("#bb").innerHTML = l
         ? `${esc(l.player.name)}<small>Next bid ${fmt(l.next)}${l.lead ? " · leading: " + nm(l.lead) : ""} · Lot ${M.done + 1}/${M.total}</small>`
         : `Next player…<small>${M.done}/${M.total} done</small>`;
-      e.querySelector("#stage").innerHTML = M.view.map(v => {
-        const t = M.teams.find(x => x.id === v.id), p = M.purses[t.id], ok = o.canControl(t), d = f => ok && f ? "" : "disabled";
-        return `<div class="tp p-${PurseFactory.status(p, M.minP)}${v.lead ? " lead" : ""}" style="--tc:${t.color}">
-          <div class="tn">${esc(t.name)}<span>${ok && Net.code ? "You · " : ""}${v.status}</span></div>
-          <div class="pu">${fmt(p.remaining)}<small>${TeamFactory.filledCount(t)}/${t.slots.length} players</small></div>
+      e.querySelector("#standings").innerHTML = standingsHtml(M.teams);
+
+      const rows = M.view.map(v => ({ v, t: M.teams.find(x => x.id === v.id), p: M.purses[v.id], mine: o.canControl(M.teams.find(x => x.id === v.id)) }));
+      const mine = rows.filter(r => r.mine), ops = rows.filter(r => !r.mine);
+
+      e.querySelector("#mine").innerHTML = mine.map(({ v, t, p }) => {
+        const d = f => f ? "" : "disabled";
+        return `<div class="mybox p-${PurseFactory.status(p, M.minP)}${v.lead ? " lead" : ""}" style="--tc:${t.color}">
+          <div class="tn">${esc(t.name)}<span>Your team · ${v.status || (l ? "Ready" : "Waiting")}</span></div>
+          <div class="pu">${fmt(p.remaining)}<small>${TeamFactory.filledCount(t)}/${t.slots.length} players filled</small></div>
           <div class="tb"><button data-a="bid" data-id="${t.id}" ${d(v.canBid)}>Bid ${l ? fmt(l.next) : ""}</button>
           <button data-a="skip" data-id="${t.id}" ${d(v.canSkip)}>Skip</button>
-          <button data-a="withdraw" data-id="${t.id}" ${d(v.canWithdraw)}>Withdraw</button></div></div>`; }).join("");
-      e.querySelector("#tview").innerHTML = M.teams.map(t => `<div class="tvt" style="--tc:${t.color}"><div class="tvh"><b>${esc(t.name)}</b><span>${fmt(M.purses[t.id].remaining)} left · overall ${TeamFactory.overall(t)}</span></div>
-        ${t.slots.map(s => `<div class="tvs"><em>${s.role}</em>${s.player ? esc(s.player.name) : "<i>empty</i>"}</div>`).join("")}</div>`).join("");
+          <button data-a="withdraw" data-id="${t.id}" ${d(v.canWithdraw)}>Withdraw</button></div></div>`;
+      }).join("") || (Net.code ? "" : `<div class="hint">You're spectating - no team of yours in this auction.</div>`);
+
+      e.querySelector("#ops").innerHTML = ops.map(({ v, t, p }) => `<div class="oprow${v.lead ? " lead" : ""}" style="--tc:${t.color}">
+        <b style="color:${t.color}">${esc(t.name)}</b>
+        <em>${TeamFactory.filledCount(t)}/${t.slots.length} · ${fmt(p.remaining)} left${v.status ? " · " + v.status : ""}</em></div>`).join("");
     };
     refresh = M => { if (e.isConnected) draw(M); };
-    e.querySelector("#stage").onclick = ev => { const b = ev.target.closest("button[data-a]"); if (b && !b.disabled) o.act(b.dataset.a, +b.dataset.id); };
-    e.querySelector("#tv").onclick = () => { const v = e.querySelector("#tview"); v.hidden = !v.hidden; };
+    e.querySelector("#mine").onclick = ev => { const b = ev.target.closest("button[data-a]"); if (b && !b.disabled) o.act(b.dataset.a, +b.dataset.id); };
+    e.querySelector("#tv").onclick = () => { const v = e.querySelector("#standings"); v.hidden = !v.hidden; };
     if (o.stop) e.querySelector("#stop").onclick = o.stop;
     draw(M0);
     return e;
   }
-  return { build, refresh: M => refresh(M) };
+  return { build, refresh: M => refresh(M), standingsHtml };
 })();
 
 const Online = (() => {
@@ -776,7 +851,7 @@ const Online = (() => {
       if (!e.isConnected) return;
       e.querySelector("#rn").textContent = L.room || "Room";
       e.querySelector("#pl").innerHTML = L.players.map(p => `<div class="tvs"><i style="width:12px;height:12px;border-radius:50%;background:${p.color || "#444"};display:inline-block"></i>
-        <b>${esc(p.name)}</b> <em>${esc(p.teamName || "…")}</em>${p.id === Net.id ? " (you)" : ""}</div>`).join("");
+        <b>${esc(p.teamName || p.name)}</b>${p.id === Net.id ? " (you)" : ""}</div>`).join("");
       go.hidden = !Net.host;
       const enough = L.players.length >= 2;
       if (Net.host) go.disabled = !enough;
@@ -808,7 +883,6 @@ const LocalTestMode = (() => {
   const NAMES = ["Royal Strikers", "Night Owls", "Thunder Kings", "Desert Hawks", "Silver Foxes", "Iron Wolves", "Blue Comets",
     "Red Dragons", "Golden Eagles", "Storm Riders", "Pink Panthers", "Green Mambas", "Sun Chasers", "Ice Breakers", "Wild Bulls", "Mighty Otters"];
   const el = html => { const d = document.createElement("div"); d.innerHTML = html.trim(); return d.firstChild; };
-  const fmt = n => PurseFactory.format(n);
   let session = null;
 
   function setup() {
@@ -862,15 +936,53 @@ const LocalTestMode = (() => {
     return e;
   }
 
-  function results(A) {
-    A = A || session.A;
-    const sold = A.results.filter(x => x.status === "sold"), unsold = A.results.filter(x => x.status !== "sold");
-    const e = el(`<div><div class="room"><h2>${A.finished ? "Auction complete" : "Auction stopped"}</h2><button class="btn" id="menu">Main menu</button></div>
-      ${A.teams.map(t => { const mine = sold.filter(x => x.teamId === t.id);
-        return `<div class="tvt" style="--tc:${t.color}"><div class="tvh"><b>${esc(t.name)}</b><span>${fmt(A.purses[t.id].remaining)} left</span></div>
-        ${mine.map(x => `<div class="tvs">${esc(x.player.name)} <em>${fmt(x.price)}</em></div>`).join("") || "<div class='tvs'><i>No players</i></div>"}</div>`; }).join("")}
+  function confetti(color) {
+    const wrap = document.createElement("div"); wrap.className = "confetti-wrap";
+    const colors = [color, "#e6b447", "#7fdcff", "#8ad06a", "#f28cb8"];
+    for (let i = 0; i < 60; i++) {
+      const c = document.createElement("div"); c.className = "confetti";
+      c.style.left = Math.random() * 100 + "%";
+      c.style.background = colors[i % colors.length];
+      c.style.animationDuration = (2.2 + Math.random() * 1.6) + "s";
+      c.style.animationDelay = (Math.random() * .6) + "s";
+      wrap.appendChild(c);
+    }
+    document.body.appendChild(wrap);
+    setTimeout(() => wrap.remove(), 4500);
+  }
+
+  // Each player's browser renders this independently, so it's personalized: my team is
+  // highlighted at the top with a win/lose hero, everyone else's teams follow ranked below.
+  function results(M) {
+    M = M || session.A;
+    const unsold = M.results.filter(x => x.status !== "sold");
+    const rank = RankFactory.rank(M.teams);
+    const myTeam = M.teams.find(t => t.owner === Net.id);
+    const mine = myTeam ? rank.find(r => r.team.id === myTeam.id) : null;
+    const winner = rank[0], iWon = !!(mine && mine.team.id === winner.team.id);
+    const status = M.finished ? "Auction complete" : "Auction stopped";
+
+    const heroHtml = mine
+      ? `<div class="res-hero${iWon ? "" : " lose"}"><small>${status}</small>
+          <h1>${iWon ? "🏆 You won!" : "So close — you lost"}</h1>
+          <div class="res-score" style="color:${mine.team.color}">${esc(mine.team.name)} · ${mine.total} pts</div>
+          <p class="res-why">${mine.stars}★ average squad quality and ${mine.diversity}/100 role balance${iWon ? ", enough to top the table." :
+            `. ${esc(winner.team.name)} won with ${winner.total} pts (${winner.stars}★, ${winner.diversity} balance).`}</p></div>`
+      : `<div class="res-hero"><small>${status}</small><h1>🏆 ${esc(winner.team.name)} wins</h1>
+          <div class="res-score" style="color:${winner.team.color}">${winner.total} pts</div>
+          <p class="res-why">${winner.stars}★ average squad quality and ${winner.diversity}/100 role balance.</p></div>`;
+
+    const ordered = mine ? [mine, ...rank.filter(r => r.team.id !== mine.team.id)] : rank;
+    const teamCard = r => { const t = r.team, isMine = mine && t.id === mine.team.id, squad = t.slots.filter(s => s.player);
+      return `<div class="tvt ${isMine ? "res-mine" : "res-opp"}" style="--tc:${t.color}">
+        <div class="tvh"><b>#${r.rank} ${esc(t.name)}${isMine ? " (you)" : ""}</b><span>${r.total} pts · ${r.stars}★ · ${r.diversity} balance</span></div>
+        ${squad.map(s => `<div class="tvs"><em>${s.role}</em>${esc(s.player.name)}</div>`).join("") || "<div class='tvs'><i>No players</i></div>"}</div>`; };
+
+    const e = el(`<div><div class="room"><h2>Results</h2><button class="btn" id="menu">Main menu</button></div>
+      ${heroHtml}${ordered.map(teamCard).join("")}
       <div class="tvt" style="--tc:var(--mute)"><div class="tvh"><b>Unsold</b></div>${unsold.map(x => `<div class="tvs">${esc(x.player.name)}</div>`).join("") || "<div class='tvs'><i>None</i></div>"}</div></div>`);
     e.querySelector("#menu").onclick = () => Online.leave();
+    if (iWon || (!mine && winner)) setTimeout(() => confetti(winner.team.color), 50);
     return e;
   }
 
