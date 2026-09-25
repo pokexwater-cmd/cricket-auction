@@ -165,6 +165,29 @@
   .res-why{max-width:420px;margin:0 auto 20px;text-align:center;color:var(--mute);font-size:.88rem}
   .res-mine{border-color:var(--gold)!important;box-shadow:0 0 0 2px var(--gold)}
   .res-opp{opacity:.8}
+
+  /* assign screen */
+  .abar{height:5px;background:var(--line);border-radius:3px;margin:8px 0 12px;overflow:hidden}
+  .abar i{display:block;height:100%;background:var(--gold);transition:width .2s linear}
+  .achars{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+  .achip{padding:9px 14px;border-radius:20px;border:1px solid var(--line);background:var(--panel);color:var(--text);font-size:.88rem}
+  .achip.sel{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
+  .achip.placed{opacity:.35}
+  .aslots{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+  .aslot{display:flex;justify-content:space-between;align-items:center;background:var(--panel);border:1px dashed var(--line);
+    border-radius:8px;padding:10px 12px;font-size:.88rem}
+  .aslot.filled{border-style:solid;border-color:var(--gold)}
+  .aslot span{color:var(--mute)}
+  .aslot.filled span{color:var(--text);font-weight:700}
+
+  /* results reveal grid */
+  .brow{padding:8px 0;border-bottom:1px solid var(--line)}
+  .brow:last-child{border-bottom:0}
+  .brow b{display:block;font-size:.8rem;color:var(--mute);margin-bottom:4px}
+  .bcells{display:flex;flex-wrap:wrap;gap:6px}
+  .bcell{font-size:.82rem;padding:4px 9px;border-radius:6px;border-left:3px solid var(--tc);background:var(--panel)}
+  .bcell em{font-style:normal;font-weight:700;margin-left:6px}
+  .bcell.win{box-shadow:0 0 0 1px var(--gold)}
 </style>
 </head>
 <body>
@@ -212,14 +235,14 @@ const PlayerFactory = (() => {
   let mode = "cricket", ROLES = MODES.cricket.roles, STAT_SCHEMA = MODES.cricket.stats;
   let nextId = 1, list = [];
 
-  function create(name, role, tier, rating, stats, source) {
+  function create(name, role, tier, rating, stats, source, core) {
     if (!ROLES[role]) throw new Error("Unknown role: " + role);
     if (!TIERS[tier]) throw new Error("Unknown tier: " + tier);
     if (!RATING_PRICE[rating]) throw new Error("Rating must be 1-5");
     const clean = {};
     for (const k in STAT_SCHEMA[role]) clean[k] = stats[k] ?? "-";
     const p = { id: nextId++, name, role, roleLabel: ROLES[role], tier, tierLabel: TIERS[tier],
-                rating, basePrice: RATING_PRICE[rating], stats: clean, source: source || "" };
+                rating, basePrice: RATING_PRICE[rating], stats: clean, source: source || "", core: core || null };
     list.push(p);
     return p;
   }
@@ -286,6 +309,74 @@ const PlayerFactory = (() => {
     "Berserk": [["Guts","D"],["Griffith","D"],["Zodd","D"],["Casca","S"],["Serpico","S"],["Schierke","S"],["Farnese","B"],["Rickert","B"],["Judeau","B"],["Puck","B"]]
   };
 
+  // ---- Character attribute profiles: POW(er) SPD(speed) DUR(ability) IQ(battle-smarts) HAX(special
+  // ability/energy) SKL (technique/weapon mastery), each 0-100, used by AttributeFactory below. Hand-set
+  // for the well-known ones from what each character is actually known for; everyone else gets a
+  // tier+role baseline (baseCore) so every character has a full profile without needing 200 hand entries. ----
+  const CORE_OVERRIDES = {
+    "Goku": { POW: 92, SPD: 88, DUR: 90, IQ: 55, HAX: 88, SKL: 65 },
+    "Vegeta": { POW: 90, SPD: 86, DUR: 85, IQ: 70, HAX: 85, SKL: 70 },
+    "Beerus": { POW: 98, SPD: 95, DUR: 95, IQ: 60, HAX: 90, SKL: 55 },
+    "Broly": { POW: 99, SPD: 80, DUR: 95, IQ: 30, HAX: 75, SKL: 35 },
+    "Frieza": { POW: 93, SPD: 90, DUR: 85, IQ: 75, HAX: 80, SKL: 60 },
+    "Saitama": { POW: 100, SPD: 75, DUR: 65, IQ: 45, HAX: 20, SKL: 50 },
+    "Blast": { POW: 97, SPD: 80, DUR: 80, IQ: 60, HAX: 70, SKL: 60 },
+    "Naruto": { POW: 80, SPD: 75, DUR: 80, IQ: 60, HAX: 85, SKL: 60 },
+    "Sasuke": { POW: 80, SPD: 82, DUR: 65, IQ: 80, HAX: 88, SKL: 80 },
+    "Madara": { POW: 88, SPD: 80, DUR: 82, IQ: 88, HAX: 92, SKL: 75 },
+    "Kaguya": { POW: 95, SPD: 85, DUR: 88, IQ: 70, HAX: 98, SKL: 55 },
+    "Ichigo": { POW: 85, SPD: 85, DUR: 78, IQ: 60, HAX: 80, SKL: 82 },
+    "Yhwach": { POW: 90, SPD: 75, DUR: 85, IQ: 85, HAX: 95, SKL: 55 },
+    "Aizen": { POW: 70, SPD: 60, DUR: 60, IQ: 98, HAX: 90, SKL: 78 },
+    "Luffy": { POW: 85, SPD: 80, DUR: 88, IQ: 50, HAX: 70, SKL: 50 },
+    "Shanks": { POW: 90, SPD: 75, DUR: 75, IQ: 85, HAX: 80, SKL: 80 },
+    "Kaido": { POW: 97, SPD: 65, DUR: 97, IQ: 55, HAX: 55, SKL: 45 },
+    "All Might": { POW: 90, SPD: 75, DUR: 85, IQ: 65, HAX: 75, SKL: 55 },
+    "All For One": { POW: 75, SPD: 60, DUR: 70, IQ: 90, HAX: 95, SKL: 50 },
+    "Deku": { POW: 65, SPD: 72, DUR: 55, IQ: 70, HAX: 60, SKL: 45 },
+    "Eren": { POW: 82, SPD: 65, DUR: 85, IQ: 60, HAX: 70, SKL: 40 },
+    "Levi": { POW: 65, SPD: 92, DUR: 65, IQ: 75, HAX: 30, SKL: 95 },
+    "Muzan": { POW: 88, SPD: 85, DUR: 85, IQ: 75, HAX: 80, SKL: 60 },
+    "Akaza": { POW: 85, SPD: 88, DUR: 80, IQ: 55, HAX: 70, SKL: 75 },
+    "Tanjiro": { POW: 45, SPD: 58, DUR: 50, IQ: 55, HAX: 40, SKL: 60 },
+    "Gojo": { POW: 70, SPD: 70, DUR: 65, IQ: 88, HAX: 99, SKL: 65 },
+    "Sukuna": { POW: 92, SPD: 80, DUR: 80, IQ: 85, HAX: 95, SKL: 80 },
+    "Toji": { POW: 75, SPD: 95, DUR: 70, IQ: 75, HAX: 10, SKL: 98 },
+    "Yuta": { POW: 78, SPD: 72, DUR: 65, IQ: 75, HAX: 90, SKL: 70 },
+    "Meruem": { POW: 95, SPD: 85, DUR: 88, IQ: 82, HAX: 88, SKL: 55 },
+    "Netero": { POW: 60, SPD: 70, DUR: 60, IQ: 90, HAX: 55, SKL: 95 },
+    "Chrollo": { POW: 55, SPD: 60, DUR: 55, IQ: 92, HAX: 85, SKL: 70 },
+    "Father": { POW: 80, SPD: 55, DUR: 80, IQ: 90, HAX: 90, SKL: 45 },
+    "Licht": { POW: 78, SPD: 70, DUR: 68, IQ: 70, HAX: 85, SKL: 60 },
+    "Julius": { POW: 60, SPD: 65, DUR: 55, IQ: 88, HAX: 92, SKL: 55 },
+    "Gildarts": { POW: 85, SPD: 65, DUR: 78, IQ: 65, HAX: 75, SKL: 60 },
+    "Zeref": { POW: 80, SPD: 55, DUR: 60, IQ: 88, HAX: 92, SKL: 45 },
+    "Acnologia": { POW: 95, SPD: 80, DUR: 92, IQ: 60, HAX: 85, SKL: 50 },
+    "Charon": { POW: 80, SPD: 60, DUR: 75, IQ: 70, HAX: 80, SKL: 55 },
+    "Toguro": { POW: 88, SPD: 78, DUR: 82, IQ: 60, HAX: 55, SKL: 75 },
+    "Sensui": { POW: 75, SPD: 70, DUR: 65, IQ: 88, HAX: 85, SKL: 70 },
+    "Dio": { POW: 80, SPD: 82, DUR: 75, IQ: 70, HAX: 90, SKL: 60 },
+    "Kars": { POW: 90, SPD: 85, DUR: 95, IQ: 75, HAX: 70, SKL: 55 },
+    "Pucci": { POW: 70, SPD: 55, DUR: 60, IQ: 85, HAX: 95, SKL: 50 },
+    "Makima": { POW: 55, SPD: 50, DUR: 55, IQ: 90, HAX: 92, SKL: 45 },
+    "Kishibe": { POW: 60, SPD: 88, DUR: 55, IQ: 85, HAX: 30, SKL: 98 },
+    "Guts": { POW: 82, SPD: 70, DUR: 88, IQ: 65, HAX: 35, SKL: 90 },
+    "Griffith": { POW: 75, SPD: 65, DUR: 65, IQ: 90, HAX: 88, SKL: 70 },
+    "Zodd": { POW: 88, SPD: 70, DUR: 90, IQ: 40, HAX: 60, SKL: 65 },
+    "Arima": { POW: 60, SPD: 80, DUR: 55, IQ: 78, HAX: 35, SKL: 97 },
+    "Eto": { POW: 75, SPD: 65, DUR: 70, IQ: 80, HAX: 82, SKL: 55 },
+    "Mob": { POW: 70, SPD: 50, DUR: 55, IQ: 60, HAX: 95, SKL: 30 }
+  };
+  function baseCore(role, tier, name) {
+    const b = { diamond: 78, gold: 62, silver: 48, bronze: 33 }[tier];
+    const h = k => { let s = 0; for (let i = 0; i < name.length; i++) s = (s * 31 + name.charCodeAt(i) + k) % 97; return (s % 21) - 10; };
+    const core = { POW: b + h(1), SPD: b + h(2), DUR: b + h(3), IQ: b + h(4), HAX: b + h(5), SKL: b + h(6) };
+    if (role === "STR") { core.POW += 14; core.SPD += 6; core.IQ -= 8; core.SKL -= 4; }
+    if (role === "TAC") { core.IQ += 14; core.SKL += 10; core.POW -= 8; core.SPD -= 3; }
+    for (const k in core) core[k] = Math.max(5, Math.min(100, Math.round(core[k])));
+    return core;
+  }
+
   function seedAnime() {
     const roles = Object.keys(ROLES); let i = 0;
     const bonus = { diamond: 14, gold: 7, silver: 3, bronze: 0 };
@@ -298,7 +389,7 @@ const PlayerFactory = (() => {
         const stats = role === "STR" ? { power: val, speed: sec, move }
                     : role === "TAC" ? { skill: val, strategy: sec, move }
                     : { power: val, skill: sec, move };
-        create(name, role, tier, rating, stats, anime);
+        create(name, role, tier, rating, stats, anime, CORE_OVERRIDES[name] || baseCore(role, tier, name));
       });
     });
   }
@@ -320,6 +411,41 @@ const PlayerFactory = (() => {
 // No UI toggle by design (per your request) - flip this one line and redeploy.
 const GameMode = { current: "anime" };
 PlayerFactory.setMode(GameMode.current);
+
+/* ================= AttributeFactory =================
+   20 battle attributes, each a weighted mix of a character's 6 core stats (POW/SPD/DUR/IQ/HAX/SKL).
+   pick(n) draws a random n of the 20 for a given game - the number of slots picked at room creation. */
+const AttributeFactory = (() => {
+  const POOL = {
+    strength:      { label: "Strength",       w: { POW: 1 } },
+    speed:         { label: "Speed",          w: { SPD: 1 } },
+    durability:    { label: "Durability",     w: { DUR: 1 } },
+    battleIQ:      { label: "Battle IQ",      w: { IQ: 1 } },
+    abilityPower:  { label: "Ability Power",  w: { HAX: .7, IQ: .3 } },
+    weaponMastery: { label: "Weapon Mastery", w: { SKL: 1 } },
+    stamina:       { label: "Stamina",        w: { DUR: .6, POW: .4 } },
+    reflexes:      { label: "Reflexes",       w: { SPD: .6, IQ: .4 } },
+    willpower:     { label: "Willpower",      w: { IQ: .5, DUR: .5 } },
+    regeneration:  { label: "Regeneration",   w: { DUR: .7, HAX: .3 } },
+    range:         { label: "Range",          w: { HAX: .6, SKL: .4 } },
+    versatility:   { label: "Versatility",    w: { POW: 1/6, SPD: 1/6, DUR: 1/6, IQ: 1/6, HAX: 1/6, SKL: 1/6 } },
+    experience:    { label: "Experience",     w: { IQ: .6, SKL: .4 } },
+    instinct:      { label: "Instinct",       w: { SPD: .5, IQ: .5 } },
+    precision:     { label: "Precision",      w: { SKL: .6, IQ: .4 } },
+    intimidation:  { label: "Intimidation",   w: { POW: .7, IQ: .3 } },
+    haxPotential:  { label: "Hax Potential",  w: { HAX: .9, SPD: .1 } },
+    teamSynergy:   { label: "Team Synergy",   w: { IQ: .5, SKL: .5 } },
+    adaptability:  { label: "Adaptability",   w: { IQ: .4, HAX: .3, SPD: .3 } },
+    endurance:     { label: "Endurance",      w: { DUR: .8, POW: .2 } }
+  };
+  function score(p, id) {
+    const def = POOL[id]; if (!def || !p.core) return 0;
+    let s = 0; for (const k in def.w) s += (p.core[k] || 0) * def.w[k];
+    return Math.round(s);
+  }
+  function pick(n) { return shuffle(Object.keys(POOL)).slice(0, Math.max(1, Math.min(n, Object.keys(POOL).length))); }
+  return { pool: () => POOL, label: id => POOL[id].label, score, pick };
+})();
 
 /* ================= TeamFactory =================
    Not used by the UI yet. Teams are plain data (safe to send over sockets);
@@ -733,7 +859,7 @@ const MenuFactory = (() => {
       <label>Room name</label><input type="text" id="name" maxlength="24" placeholder="Friday night auction">
       <label>Your team name</label><input type="text" id="tn" maxlength="20" placeholder="e.g. Royal Strikers">
       <label>Players <b id="pv">4</b></label><input type="range" id="p" min="1" max="10" value="4">
-      <label>Teams <b id="tv">2</b></label><input type="range" id="t" min="1" max="10" value="2">
+      <div class="hint">Each player gets their own team - number of players = number of teams.</div>
       <label>Slots per team <b id="kv">6</b></label><input type="range" id="k" min="3" max="12" value="6">
       <div class="hint" id="split"></div>
       <label>Purse per team <b id="uv"></b></label><input type="range" id="u" min="10" max="500" step="5" value="100">
@@ -743,23 +869,23 @@ const MenuFactory = (() => {
       <div class="hint">How long each card stays before it skips.</div>
       <button class="btn primary" id="go">Create</button>
       <button class="link" id="back">Back</button></div></div>`);
-    const p = $(e, "#p"), t = $(e, "#t"), k = $(e, "#k"), s = $(e, "#s"), u = $(e, "#u"), un = $(e, "#un");
+    const p = $(e, "#p"), k = $(e, "#k"), s = $(e, "#s"), u = $(e, "#u"), un = $(e, "#un");
     const purse = () => Math.max(1, +un.value || 0);
     const sync = () => {
-      $(e, "#pv").textContent = p.value; $(e, "#tv").textContent = t.value;
+      $(e, "#pv").textContent = p.value;
       $(e, "#kv").textContent = k.value; $(e, "#sv").textContent = s.value + "s";
       $(e, "#uv").textContent = PurseFactory.format(purse());
       const q = TeamFactory.roleQuota(+k.value);
       $(e, "#split").textContent = "Each team: " + Object.keys(q).map(r => q[r] + " " + r.toLowerCase()).join(", ");
     };
-    p.oninput = t.oninput = k.oninput = s.oninput = un.oninput = sync;
+    p.oninput = k.oninput = s.oninput = un.oninput = sync;
     u.oninput = () => { un.value = u.value; sync(); };
     un.addEventListener("input", () => { u.value = un.value; });
     sync();
     $(e, "#back").onclick = () => Screens.show("main");
     $(e, "#go").onclick = () => {
       RoomSettings.current = { code: RoomSettings.newCode(), name: $(e, "#name").value.trim() || "Untitled room",
-        players: +p.value, teams: +t.value, slots: +k.value, purse: purse(), timer: +s.value };
+        players: +p.value, teams: +p.value, slots: +k.value, purse: purse(), timer: +s.value };
       const tn = $(e, "#tn").value.trim();
       if (LocalTestMode.on) Screens.show("setup"); else Online.open("create", {
         name: tn || "Host", teamName: tn, color: "" });
@@ -869,28 +995,110 @@ const GameView = (() => {
   return { build, refresh: M => refresh(M), standingsHtml };
 })();
 
+/* ================= AssignView: private, tap-to-place attribute screen =================
+   Each player sees only their own purchased characters and this game's attribute slots. Tap a
+   character, then tap a slot to place them (tap again to unplace); nothing is revealed to anyone
+   else until the results screen after everyone locks in or the 60s timer runs out. */
+const AssignView = (() => {
+  function build(myChars, attrIds, deadline, onSubmit) {
+    const state = {};           // attrId -> playerId
+    let selected = null, submitted = false;
+    const e = mk(`<div class="assign"><div class="room"><h2>Assign your line-up</h2></div>
+      <div class="abar"><i id="abari"></i></div>
+      <p class="hint">Tap a character, then tap an attribute to place them. This stays hidden until reveal.</p>
+      <div class="achars" id="achars"></div>
+      <div class="aslots" id="aslots"></div>
+      <button class="btn primary" id="lock">Lock in</button></div>`);
+    const charName = id => (myChars.find(c => c.id === id) || {}).name || "";
+    const draw = () => {
+      e.querySelector("#achars").innerHTML = myChars.map(c => {
+        const placed = Object.values(state).includes(c.id);
+        return `<button class="achip${placed ? " placed" : ""}${selected === c.id ? " sel" : ""}" data-id="${c.id}" ${placed && !submitted ? "" : submitted ? "disabled" : ""}>${esc(c.name)}</button>`;
+      }).join("");
+      e.querySelector("#aslots").innerHTML = attrIds.map(id => `<div class="aslot${state[id] ? " filled" : ""}" data-attr="${id}">
+        <b>${esc(AttributeFactory.label(id))}</b><span>${state[id] ? esc(charName(state[id])) : "Tap to place"}</span></div>`).join("");
+      const lock = e.querySelector("#lock");
+      lock.disabled = submitted || Object.keys(state).length < Math.min(myChars.length, attrIds.length);
+      lock.textContent = submitted ? "Waiting for others…" : "Lock in";
+    };
+    e.querySelector("#achars").onclick = ev => {
+      if (submitted) return;
+      const b = ev.target.closest(".achip"); if (!b) return;
+      const id = +b.dataset.id;
+      if (Object.values(state).includes(id)) { for (const k in state) if (state[k] === id) delete state[k]; selected = null; }
+      else selected = selected === id ? null : id;
+      draw();
+    };
+    e.querySelector("#aslots").onclick = ev => {
+      if (submitted) return;
+      const s = ev.target.closest(".aslot"); if (!s) return;
+      const id = s.dataset.attr;
+      if (selected != null) { for (const k in state) if (state[k] === selected) delete state[k]; state[id] = selected; selected = null; }
+      else if (state[id] != null) delete state[id];
+      draw();
+    };
+    const submit = () => { if (submitted) return; submitted = true; onSubmit({ ...state }); draw(); };
+    e.querySelector("#lock").onclick = submit;
+    const iv = setInterval(() => {
+      const left = Math.max(0, deadline - Date.now());
+      const bar = e.querySelector("#abari"); if (bar) bar.style.width = Math.round(left / 60000 * 100) + "%"; else clearInterval(iv);
+      if (left <= 0) { clearInterval(iv); submit(); }
+    }, 200);
+    draw();
+    return e;
+  }
+  return { build };
+})();
+
 const Online = (() => {
   const L = { room: "", players: [], started: false, max: 4 };   // lobby: the host owns it and broadcasts it
-  let A = null, inGame = false, guestCard = null, guestLot = null, refreshLobby = () => {};
+  let A = null, inGame = false, guestCard = null, guestLot = null, refreshLobby = () => {}, lastM = null;
+  let assignAttrs = [], assignDeadline = 0, assignPicks = {}, assignTimer = null, assignDone = false;
   const me = () => L.players.find(p => p.id === Net.id);
   const lobbyBc = () => { Net.send({ t: "lobby", L }); refreshLobby(); };
 
   function leave() {
-    Net.h = {}; if (Net.ws) Net.ws.close();
-    Net.ws = null; Net.code = null; Net.id = null; A = null; inGame = false; guestCard = guestLot = null;
+    Net.h = {}; if (Net.ws) Net.ws.close(); clearTimeout(assignTimer);
+    Net.ws = null; Net.code = null; Net.id = null; A = null; inGame = false; guestCard = guestLot = null; lastM = null;
     Screens.show("main");
   }
 
-  function hostAct(kind, from) {                 // runs on the host: a player asks to bid/skip/withdraw for their own team
+  function hostAct(kind, from, payload) {        // runs on the host: a player asks to bid/skip/withdraw/assign for their own team
+    if (kind === "assign") return receiveAssign(from, payload);
     const team = A && A.teams.find(t => t.owner === from);
     if (!team || !["bid", "skip", "withdraw"].includes(kind)) return;
     const r = A[kind](team.id);
     if (r && r.reason) { if (from === Net.id) toast(r.reason); else Net.send({ t: "toast", to: from, msg: r.reason }); }
   }
 
-  function finish() {
-    const M = { teams: A.teams, purses: A.purses, results: A.results, finished: A.finished };
+  function receiveAssign(from, picks) {           // host: collect one team's private assignment
+    const team = A && A.teams.find(t => t.owner === from); if (!team || assignDone) return;
+    assignPicks[team.id] = picks || {};
+    if (Object.keys(assignPicks).length >= A.teams.length) finalizeAssign();
+  }
+
+  function finalizeAssign() {                     // host: everyone's in (or time's up) - reveal to all at once
+    if (assignDone) return; assignDone = true; clearTimeout(assignTimer);
+    A.teams.forEach(t => { if (!assignPicks[t.id]) assignPicks[t.id] = {}; });   // anyone who never locked in gets an empty board
+    const M = { teams: A.teams, purses: A.purses, results: A.results, finished: A.finished,
+                assign: { attrs: assignAttrs, picks: assignPicks } };
     Net.send({ t: "end", M }); Screens.show("results", M);
+  }
+
+  function finish() {                             // auction just ended - open the private assign phase instead of results
+    const cfg = RoomSettings.current;
+    assignAttrs = AttributeFactory.pick(cfg.slots || 6); assignDeadline = Date.now() + 60000; assignPicks = {}; assignDone = false;
+    Net.send({ t: "assign-start", attrs: assignAttrs, deadline: assignDeadline });
+    clearTimeout(assignTimer); assignTimer = setTimeout(finalizeAssign, 60300);
+    const team = A.teams.find(t => t.owner === Net.id);
+    Screens.show("assign", { attrs: assignAttrs, deadline: assignDeadline, team });
+  }
+
+  function assign(data) {                         // host and guests both render this from their own team's squad
+    const myChars = data.team ? data.team.slots.filter(s => s.player).map(s => s.player) : [];
+    return AssignView.build(myChars, data.attrs, data.deadline, picks => {
+      if (Net.host) receiveAssign(Net.id, picks); else Net.send({ t: "act", kind: "assign", payload: picks });
+    });
   }
 
   function start() {
@@ -932,12 +1140,14 @@ const Online = (() => {
         if (L.players.length >= L.max) start(); },
       "peer-left": m => { const p = L.players.find(x => x.id === m.id);
         if (L.started) { if (p) toast(p.name + " left"); } else { L.players = L.players.filter(x => x.id !== m.id); lobbyBc(); } },
-      act: m => hostAct(m.kind, m.from),
+      act: m => hostAct(m.kind, m.from, m.payload),
       lobby: m => { Object.assign(L, m.L); refreshLobby(); },
       full: () => { toast("Room is full or already started"); leave(); },
-      snap: m => { if (!inGame) { inGame = true; Screens.show("game", m.M); } else GameView.refresh(m.M); syncCard(m.M); },
+      snap: m => { lastM = m.M; if (!inGame) { inGame = true; Screens.show("game", m.M); } else GameView.refresh(m.M); syncCard(m.M); },
       tr: m => TransitionFactory.play(m.o),
       toast: m => toast(m.msg),
+      "assign-start": m => { const team = lastM && lastM.teams.find(t => t.owner === Net.id);
+        Screens.show("assign", { attrs: m.attrs, deadline: m.deadline, team }); },
       end: m => Screens.show("results", m.M),
       closed: () => { toast("Room closed"); leave(); }
     };
@@ -975,7 +1185,7 @@ const Online = (() => {
       stop: Net.host ? () => { A.stop(); finish(); } : null, canControl: t => t.owner === Net.id });
   }
 
-  return { open, lobby, game, leave };
+  return { open, lobby, game, assign, leave };
 })();
 
 /* ================= LocalTestMode =================
@@ -1057,36 +1267,61 @@ const LocalTestMode = (() => {
 
   // Each player's browser renders this independently, so it's personalized: my team is
   // highlighted at the top with a win/lose hero, everyone else's teams follow ranked below.
+  // When M.assign is present (the online flow), the winner is decided by the private attribute
+  // assignment everyone just locked in, revealed here for the first time - not just squad quality.
   function results(M) {
     M = M || session.A;
     const unsold = M.results.filter(x => x.status !== "sold");
     const rank = RankFactory.rank(M.teams);
     const myTeam = M.teams.find(t => t.owner === Net.id);
-    const mine = myTeam ? rank.find(r => r.team.id === myTeam.id) : null;
-    const winner = rank[0], iWon = !!(mine && mine.team.id === winner.team.id);
     const status = M.finished ? "Auction complete" : "Auction stopped";
 
-    const heroHtml = mine
+    let board = null, totals = null, winnerTeam = rank[0].team, winnerPts = rank[0].total, myPts = null;
+    if (M.assign && M.assign.attrs && M.assign.attrs.length) {
+      const attrs = M.assign.attrs, picks = M.assign.picks || {};
+      const findPlayer = id => { for (const t of M.teams) for (const s of t.slots) if (s.player && s.player.id === id) return s.player; return null; };
+      totals = {}; M.teams.forEach(t => totals[t.id] = 0);
+      board = attrs.map(attrId => {
+        const row = M.teams.map(t => {
+          const pid = (picks[t.id] || {})[attrId], p = pid != null ? findPlayer(pid) : null;
+          const s = p ? AttributeFactory.score(p, attrId) : 0;
+          totals[t.id] += s;
+          return { team: t, player: p, score: s };
+        });
+        return { attrId, row, best: Math.max(...row.map(x => x.score)) };
+      });
+      winnerTeam = M.teams.reduce((a, b) => totals[b.id] > totals[a.id] ? b : a);
+      winnerPts = totals[winnerTeam.id];
+      myPts = myTeam ? totals[myTeam.id] : null;
+    } else if (myTeam) {
+      myPts = rank.find(r => r.team.id === myTeam.id).total;
+    }
+    const iWon = !!(myTeam && winnerTeam.id === myTeam.id);
+
+    const heroHtml = myTeam
       ? `<div class="res-hero${iWon ? "" : " lose"}"><small>${status}</small>
           <h1>${iWon ? "🏆 You won!" : "So close — you lost"}</h1>
-          <div class="res-score" style="color:${mine.team.color}">${esc(mine.team.name)} · ${mine.total} pts</div>
-          <p class="res-why">${mine.stars}★ average squad quality and ${mine.diversity}/100 role balance${iWon ? ", enough to top the table." :
-            `. ${esc(winner.team.name)} won with ${winner.total} pts (${winner.stars}★, ${winner.diversity} balance).`}</p></div>`
-      : `<div class="res-hero"><small>${status}</small><h1>🏆 ${esc(winner.team.name)} wins</h1>
-          <div class="res-score" style="color:${winner.team.color}">${winner.total} pts</div>
-          <p class="res-why">${winner.stars}★ average squad quality and ${winner.diversity}/100 role balance.</p></div>`;
+          <div class="res-score" style="color:${myTeam.color}">${esc(myTeam.name)} · ${myPts} pts</div>
+          <p class="res-why">${iWon ? "Your line-up scored highest overall." : `${esc(winnerTeam.name)} won with ${winnerPts} pts.`}</p></div>`
+      : `<div class="res-hero"><small>${status}</small><h1>🏆 ${esc(winnerTeam.name)} wins</h1>
+          <div class="res-score" style="color:${winnerTeam.color}">${winnerPts} pts</div></div>`;
 
-    const ordered = mine ? [mine, ...rank.filter(r => r.team.id !== mine.team.id)] : rank;
-    const teamCard = r => { const t = r.team, isMine = mine && t.id === mine.team.id, squad = t.slots.filter(s => s.player);
+    const boardHtml = board ? `<div class="tvt" style="--tc:var(--gold)"><div class="tvh"><b>Reveal</b><span>Nobody saw this until now</span></div>
+      ${board.map(r => `<div class="brow"><b>${esc(AttributeFactory.label(r.attrId))}</b><div class="bcells">
+        ${r.row.map(x => `<span class="bcell${x.score === r.best && x.score > 0 ? " win" : ""}" style="--tc:${x.team.color}">${x.player ? esc(x.player.name) : "—"}<em>${x.score}</em></span>`).join("")}
+      </div></div>`).join("")}</div>` : "";
+
+    const ordered = myTeam ? [rank.find(r => r.team.id === myTeam.id), ...rank.filter(r => r.team.id !== myTeam.id)] : rank;
+    const teamCard = r => { const t = r.team, isMine = myTeam && t.id === myTeam.id, squad = t.slots.filter(s => s.player);
       return `<div class="tvt ${isMine ? "res-mine" : "res-opp"}" style="--tc:${t.color}">
-        <div class="tvh"><b>#${r.rank} ${esc(t.name)}${isMine ? " (you)" : ""}</b><span>${r.total} pts · ${r.stars}★ · ${r.diversity} balance</span></div>
+        <div class="tvh"><b>${esc(t.name)}${isMine ? " (you)" : ""}</b><span>Squad quality: ${r.total} · ${r.stars}★ · ${r.diversity} balance</span></div>
         ${squad.map(s => `<div class="tvs"><em>${s.role}</em>${esc(s.player.name)}</div>`).join("") || "<div class='tvs'><i>No players</i></div>"}</div>`; };
 
     const e = el(`<div><div class="room"><h2>Results</h2><button class="btn" id="menu">Main menu</button></div>
-      ${heroHtml}${ordered.map(teamCard).join("")}
+      ${heroHtml}${boardHtml}${ordered.map(teamCard).join("")}
       <div class="tvt" style="--tc:var(--mute)"><div class="tvh"><b>Unsold</b></div>${unsold.map(x => `<div class="tvs">${esc(x.player.name)}</div>`).join("") || "<div class='tvs'><i>None</i></div>"}</div></div>`);
     e.querySelector("#menu").onclick = () => Online.leave();
-    if (iWon || (!mine && winner)) setTimeout(() => confetti(winner.team.color), 50);
+    if (iWon || !myTeam) setTimeout(() => confetti(winnerTeam.color), 50);
     return e;
   }
 
@@ -1095,7 +1330,7 @@ const LocalTestMode = (() => {
 
 ["main", "create", "join", "room"].forEach(id => Screens.register(id, MenuFactory[id]));
 ["setup", "auction", "results"].forEach(id => Screens.register(id, LocalTestMode[id]));
-Screens.register("lobby", Online.lobby); Screens.register("game", Online.game);
+Screens.register("lobby", Online.lobby); Screens.register("game", Online.game); Screens.register("assign", Online.assign);
 Screens.show("main");
 </script>
 </body>
